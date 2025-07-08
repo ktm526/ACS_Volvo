@@ -1,0 +1,183 @@
+import React, { createContext, useContext, useReducer } from 'react';
+import { ROBOT_STATUS, MISSION_STATUS } from '../constants';
+
+const AppContext = createContext();
+
+// 초기 상태
+const initialState = {
+  currentPage: 'main',
+  selectedRobot: null,
+  hoveredRobot: null,
+  connectionStatus: 'connected', // connected, disconnected, connecting
+  systemStatus: 'normal', // normal, warning, error
+  notifications: [],
+  filters: {
+    robotStatus: null,
+    missionStatus: null
+  },
+  ui: {
+    showTooltips: true,
+    theme: 'dark',
+    language: 'ko'
+  }
+};
+
+// 액션 타입
+const ACTION_TYPES = {
+  SET_CURRENT_PAGE: 'SET_CURRENT_PAGE',
+  SET_SELECTED_ROBOT: 'SET_SELECTED_ROBOT',
+  SET_HOVERED_ROBOT: 'SET_HOVERED_ROBOT',
+  SET_CONNECTION_STATUS: 'SET_CONNECTION_STATUS',
+  SET_SYSTEM_STATUS: 'SET_SYSTEM_STATUS',
+  ADD_NOTIFICATION: 'ADD_NOTIFICATION',
+  REMOVE_NOTIFICATION: 'REMOVE_NOTIFICATION',
+  SET_FILTER: 'SET_FILTER',
+  CLEAR_FILTERS: 'CLEAR_FILTERS',
+  UPDATE_UI_SETTING: 'UPDATE_UI_SETTING'
+};
+
+// 리듀서
+const appReducer = (state, action) => {
+  switch (action.type) {
+    case ACTION_TYPES.SET_CURRENT_PAGE:
+      return {
+        ...state,
+        currentPage: action.payload
+      };
+
+    case ACTION_TYPES.SET_SELECTED_ROBOT:
+      return {
+        ...state,
+        selectedRobot: action.payload
+      };
+
+    case ACTION_TYPES.SET_HOVERED_ROBOT:
+      return {
+        ...state,
+        hoveredRobot: action.payload
+      };
+
+    case ACTION_TYPES.SET_CONNECTION_STATUS:
+      return {
+        ...state,
+        connectionStatus: action.payload
+      };
+
+    case ACTION_TYPES.SET_SYSTEM_STATUS:
+      return {
+        ...state,
+        systemStatus: action.payload
+      };
+
+    case ACTION_TYPES.ADD_NOTIFICATION:
+      return {
+        ...state,
+        notifications: [...state.notifications, {
+          id: Date.now(),
+          ...action.payload,
+          timestamp: new Date()
+        }]
+      };
+
+    case ACTION_TYPES.REMOVE_NOTIFICATION:
+      return {
+        ...state,
+        notifications: state.notifications.filter(
+          notification => notification.id !== action.payload
+        )
+      };
+
+    case ACTION_TYPES.SET_FILTER:
+      return {
+        ...state,
+        filters: {
+          ...state.filters,
+          [action.payload.type]: action.payload.value
+        }
+      };
+
+    case ACTION_TYPES.CLEAR_FILTERS:
+      return {
+        ...state,
+        filters: {
+          robotStatus: null,
+          missionStatus: null
+        }
+      };
+
+    case ACTION_TYPES.UPDATE_UI_SETTING:
+      return {
+        ...state,
+        ui: {
+          ...state.ui,
+          [action.payload.setting]: action.payload.value
+        }
+      };
+
+    default:
+      return state;
+  }
+};
+
+// Provider 컴포넌트
+export const AppProvider = ({ children }) => {
+  const [state, dispatch] = useReducer(appReducer, initialState);
+
+  // 액션 생성자들
+  const actions = {
+    setCurrentPage: (page) => {
+      dispatch({ type: ACTION_TYPES.SET_CURRENT_PAGE, payload: page });
+    },
+
+    setSelectedRobot: (robot) => {
+      dispatch({ type: ACTION_TYPES.SET_SELECTED_ROBOT, payload: robot });
+    },
+
+    setHoveredRobot: (robot) => {
+      dispatch({ type: ACTION_TYPES.SET_HOVERED_ROBOT, payload: robot });
+    },
+
+    setConnectionStatus: (status) => {
+      dispatch({ type: ACTION_TYPES.SET_CONNECTION_STATUS, payload: status });
+    },
+
+    setSystemStatus: (status) => {
+      dispatch({ type: ACTION_TYPES.SET_SYSTEM_STATUS, payload: status });
+    },
+
+    addNotification: (notification) => {
+      dispatch({ type: ACTION_TYPES.ADD_NOTIFICATION, payload: notification });
+    },
+
+    removeNotification: (id) => {
+      dispatch({ type: ACTION_TYPES.REMOVE_NOTIFICATION, payload: id });
+    },
+
+    setFilter: (type, value) => {
+      dispatch({ type: ACTION_TYPES.SET_FILTER, payload: { type, value } });
+    },
+
+    clearFilters: () => {
+      dispatch({ type: ACTION_TYPES.CLEAR_FILTERS });
+    },
+
+    updateUISetting: (setting, value) => {
+      dispatch({ type: ACTION_TYPES.UPDATE_UI_SETTING, payload: { setting, value } });
+    }
+  };
+
+  return (
+    <AppContext.Provider value={{ state, actions }}>
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+// 커스텀 훅
+export const useAppContext = () => {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useAppContext must be used within an AppProvider');
+  }
+  return context;
+}; 
