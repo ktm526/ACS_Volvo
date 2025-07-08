@@ -5,6 +5,135 @@ import { createPortal } from 'react-dom';
 import { STATIONS, PATHS } from '../../constants';
 import * as THREE from 'three';
 
+// 카메라 애니메이션 컴포넌트
+function CameraController({ viewMode, zoomLevel, trackedRobot, duration = 1.0 }) {
+  const { camera, controls } = useThree();
+  const animationRef = useRef(null);
+  const lastConfig = useRef({ viewMode: null, zoomLevel: null, trackedRobot: null });
+
+  useEffect(() => {
+    if (!controls) return;
+
+    // 설정이 변경되었는지 확인
+    const configChanged = 
+      lastConfig.current.viewMode !== viewMode ||
+      lastConfig.current.zoomLevel !== zoomLevel ||
+      lastConfig.current.trackedRobot !== trackedRobot?.id;
+
+    if (!configChanged) return;
+
+    // 이전 애니메이션 취소
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
+
+    // 현재 구면 좌표 계산
+    const currentDistance = camera.position.distanceTo(controls.target);
+    const currentPolar = Math.acos(Math.max(-1, Math.min(1, 
+      (camera.position.y - controls.target.y) / currentDistance
+    )));
+    const currentAzimuth = Math.atan2(
+      camera.position.x - controls.target.x,
+      camera.position.z - controls.target.z
+    );
+
+    // 목표 설정 계산
+    let targetDistance, targetPolar, targetAzimuth, targetTarget;
+
+    // 줌 레벨에 따른 거리 계산 (20~100 범위)
+    targetDistance = 20 + (3 - zoomLevel) * 30; // zoomLevel 3일 때 20, 0.5일 때 95
+
+    // 뷰 모드에 따른 극각 계산
+    if (viewMode === 'overview') {
+      targetPolar = Math.PI * 0.005; // 거의 완전 수직 (약 0.9도)
+    } else {
+      targetPolar = Math.PI * 0.2; // 약 54도 기울임
+    }
+
+    // 로봇 추적 여부에 따른 타겟과 방위각 설정
+    if (trackedRobot) {
+      targetTarget = new THREE.Vector3(
+        trackedRobot.location_x || 0, 
+        0, 
+        trackedRobot.location_y || 0
+      );
+      // 추적 모드에서는 현재 방위각 유지 (부드러운 추적)
+      targetAzimuth = currentAzimuth;
+    } else {
+      targetTarget = new THREE.Vector3(0, 0, 0);
+      // 일반 모드에서는 정면 (0도) - 격자가 정방향이 되도록
+      targetAzimuth = 0; // 0도 (정면)
+    }
+
+    console.log('Camera smooth transition:', { 
+      viewMode, 
+      zoomLevel,
+      targetDistance,
+      targetPolar: (targetPolar * 180 / Math.PI).toFixed(1) + '°',
+      trackedRobot: trackedRobot?.id
+    });
+
+    // 애니메이션 시작값
+    const startDistance = currentDistance;
+    const startPolar = currentPolar;
+    const startAzimuth = currentAzimuth;
+    const startTarget = controls.target.clone();
+    const startTime = Date.now();
+
+    const animate = () => {
+      const elapsed = (Date.now() - startTime) / 1000;
+      const progress = Math.min(elapsed / duration, 1);
+
+      // 부드러운 easing (더 자연스러운 곡선)
+      const easeProgress = progress < 0.5 
+        ? 2 * progress * progress 
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+      // 값들 보간
+      const currentDist = THREE.MathUtils.lerp(startDistance, targetDistance, easeProgress);
+      const currentPol = THREE.MathUtils.lerp(startPolar, targetPolar, easeProgress);
+      const currentAzi = THREE.MathUtils.lerp(startAzimuth, targetAzimuth, easeProgress);
+      
+      // 타겟 보간
+      const currentTarget = new THREE.Vector3().lerpVectors(startTarget, targetTarget, easeProgress);
+
+      // 구면 좌표를 직교 좌표로 변환
+      const x = currentTarget.x + currentDist * Math.sin(currentPol) * Math.sin(currentAzi);
+      const y = currentTarget.y + currentDist * Math.cos(currentPol);
+      const z = currentTarget.z + currentDist * Math.sin(currentPol) * Math.cos(currentAzi);
+
+      // 카메라와 컨트롤 업데이트
+      camera.position.set(x, y, z);
+      controls.target.copy(currentTarget);
+      controls.update();
+
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animate);
+      } else {
+        animationRef.current = null;
+        console.log('Camera transition completed');
+      }
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    // 현재 설정 저장
+    lastConfig.current = {
+      viewMode,
+      zoomLevel,
+      trackedRobot: trackedRobot?.id
+    };
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [viewMode, zoomLevel, trackedRobot, camera, controls, duration]);
+
+  return null;
+}
+
 // 미래적인 색상 팔레트
 const METRO_COLORS = {
   // 주요 노선 색상
@@ -135,21 +264,56 @@ const CONNECTION_PATHS = [
 
 // 노선 렌더링 컴포넌트
 function MetroLine({ line, isActive = false }) {
-  const points = line.points.map(([x, y]) => new THREE.Vector3(x, 0.1, y));
+  if (!line || !line.points || !Array.isArray(line.points)) {
+    console.warn('MetroLine: Invalid line data', line);
+    return null;
+  }
+
+  // 유효한 점들만 필터링
+  const validPoints = line.points.filter(point => {
+    if (!Array.isArray(point) || point.length < 2) return false;
+    const [x, y] = point;
+    return typeof x === 'number' && typeof y === 'number' && 
+           !isNaN(x) && !isNaN(y) && 
+           isFinite(x) && isFinite(y);
+  });
   
-  return (
-    <group>
-      {/* 메인 노선 */}
-      <Line
-        points={points}
-        color={line.color}
-        lineWidth={2}
-        segments
-        transparent
-        opacity={0.8}
-      />
-    </group>
-  );
+  // 최소 2개의 점이 있어야 라인을 그릴 수 있음
+  if (validPoints.length < 2) {
+    console.warn('MetroLine: Not enough valid points', { line: line.id, validPoints: validPoints.length });
+    return null;
+  }
+  
+  try {
+    const points = validPoints.map(([x, y]) => new THREE.Vector3(x, 0.1, y));
+    
+    // 포인트 배열 유효성 재검사
+    const validVectors = points.filter(point => 
+      !isNaN(point.x) && !isNaN(point.y) && !isNaN(point.z) &&
+      isFinite(point.x) && isFinite(point.y) && isFinite(point.z)
+    );
+
+    if (validVectors.length < 2) {
+      console.warn('MetroLine: Not enough valid Vector3 points', { line: line.id, validVectors: validVectors.length });
+      return null;
+    }
+    
+    return (
+      <group>
+        <Line
+          points={validVectors}
+          color={line.color || '#FFFFFF'}
+          lineWidth={2}
+          segments={true}
+          transparent={true}
+          opacity={0.8}
+        />
+      </group>
+    );
+  } catch (error) {
+    console.error('MetroLine: Error creating line', error);
+    return null;
+  }
 }
 
 // 스테이션 컴포넌트
@@ -397,39 +561,108 @@ function MetroRobot({ robot, isSelected = false, onHover, onHoverEnd }) {
 
 // 경로 트레일 컴포넌트
 function PathTrail({ path, color }) {
-  if (!path || path.length < 2) return null;
+  if (!path || !Array.isArray(path) || path.length < 2) {
+    console.warn('PathTrail: Invalid path data', { path, pathLength: path?.length });
+    return null;
+  }
   
-  const points = path.map(([x, y]) => new THREE.Vector3(x, 0.2, y));
+  // 유효한 점들만 필터링
+  const validPath = path.filter(point => {
+    if (!Array.isArray(point) || point.length < 2) return false;
+    const [x, y] = point;
+    return typeof x === 'number' && typeof y === 'number' && 
+           !isNaN(x) && !isNaN(y) && 
+           isFinite(x) && isFinite(y);
+  });
   
-  return (
-    <Line
-      points={points}
-      color={color}
-      lineWidth={2}
-      dashed
-      dashScale={0.5}
-      dashSize={0.5}
-      gapSize={0.3}
-      transparent
-      opacity={0.8}
-    />
-  );
+  if (validPath.length < 2) {
+    console.warn('PathTrail: Not enough valid points', { validPoints: validPath.length });
+    return null;
+  }
+  
+  try {
+    const points = validPath.map(([x, y]) => new THREE.Vector3(x, 0.2, y));
+    
+    // 포인트 배열 유효성 재검사
+    const validPoints = points.filter(point => 
+      !isNaN(point.x) && !isNaN(point.y) && !isNaN(point.z) &&
+      isFinite(point.x) && isFinite(point.y) && isFinite(point.z)
+    );
+
+    if (validPoints.length < 2) {
+      console.warn('PathTrail: Not enough valid Vector3 points', { validPoints: validPoints.length });
+      return null;
+    }
+    
+    return (
+      <Line
+        points={validPoints}
+        color={color || '#FFFFFF'}
+        lineWidth={2}
+        dashed={true}
+        dashScale={0.5}
+        dashSize={0.5}
+        gapSize={0.3}
+        transparent={true}
+        opacity={0.8}
+      />
+    );
+  } catch (error) {
+    console.error('PathTrail: Error creating line', error);
+    return null;
+  }
 }
 
 // 연결 경로 렌더링 컴포넌트
 function ConnectionPath({ path }) {
-  const points = path.points.map(([x, y]) => new THREE.Vector3(x, 0.05, y));
+  if (!path || !path.points || !Array.isArray(path.points)) {
+    console.warn('ConnectionPath: Invalid path data', path);
+    return null;
+  }
+
+  // 유효한 점들만 필터링
+  const validPoints = path.points.filter(point => {
+    if (!Array.isArray(point) || point.length < 2) return false;
+    const [x, y] = point;
+    return typeof x === 'number' && typeof y === 'number' && 
+           !isNaN(x) && !isNaN(y) && 
+           isFinite(x) && isFinite(y);
+  });
   
-  return (
-    <Line
-      points={points}
-      color={path.color}
-      lineWidth={2}
-      segments
-      transparent
-      opacity={0.8}
-    />
-  );
+  // 최소 2개의 점이 있어야 라인을 그릴 수 있음
+  if (validPoints.length < 2) {
+    console.warn('ConnectionPath: Not enough valid points', { validPoints: validPoints.length });
+    return null;
+  }
+  
+  try {
+    const points = validPoints.map(([x, y]) => new THREE.Vector3(x, 0.05, y));
+    
+    // 포인트 배열 유효성 재검사
+    const validVectors = points.filter(point => 
+      !isNaN(point.x) && !isNaN(point.y) && !isNaN(point.z) &&
+      isFinite(point.x) && isFinite(point.y) && isFinite(point.z)
+    );
+
+    if (validVectors.length < 2) {
+      console.warn('ConnectionPath: Not enough valid Vector3 points', { validVectors: validVectors.length });
+      return null;
+    }
+    
+    return (
+      <Line
+        points={validVectors}
+        color={path.color || '#FFFFFF'}
+        lineWidth={2}
+        segments={true}
+        transparent={true}
+        opacity={0.8}
+      />
+    );
+  } catch (error) {
+    console.error('ConnectionPath: Error creating line', error);
+    return null;
+  }
 }
 
 // 단순한 그리드
@@ -640,7 +873,9 @@ const Scene3D = ({
   showPaths = true,
   showStations = true,
   showGrid = true,
-  showLabels = false
+  showLabels = false,
+  zoomLevel = 1,
+  trackedRobot = null
 }) => {
   const [activeLines, setActiveLines] = useState(['line1', 'line2']);
   const [tooltipData, setTooltipData] = useState({ robot: null, position: null, visible: false });
@@ -707,6 +942,18 @@ const Scene3D = ({
   // 항상 고정된 데이터 사용
   const activeRobots = FIXED_ROBOTS;
 
+  // 추적 중인 로봇 찾기
+  const trackedRobotData = activeRobots.find(robot => robot.id === trackedRobot);
+  
+  // 카메라 설정 변경 감지를 위한 로그
+  useEffect(() => {
+    console.log('Scene3D props updated:', { 
+      viewMode, 
+      zoomLevel, 
+      trackedRobot: trackedRobotData?.id 
+    });
+  }, [viewMode, zoomLevel, trackedRobotData]);
+
   const handleRobotHover = useCallback((robot, position) => {
     console.log(`Main component - Robot ${robot.id} hover with position:`, position);
     setTooltipData({ robot, position, visible: true });
@@ -727,7 +974,7 @@ const Scene3D = ({
     <>
       <Canvas
         camera={{ 
-          position: [0, 40, 0], 
+          position: [0, 35, 30], 
           fov: 60,
           near: 0.1,
           far: 200
@@ -795,17 +1042,29 @@ const Scene3D = ({
           )
         ))}
 
-        {/* 카메라 컨트롤 */}
+        {/* 카메라 컨트롤 및 애니메이션 컨트롤러 */}
+        <CameraController 
+          viewMode={viewMode}
+          zoomLevel={zoomLevel}
+          trackedRobot={trackedRobotData}
+          duration={1.0}
+        />
+        
         <OrbitControls 
-          enableDamping
+          enableDamping={true}
           dampingFactor={0.05}
-          minDistance={15}
-          maxDistance={80}
-          maxPolarAngle={Math.PI / 2}
-          target={[0, 0, 0]}
+          minDistance={10}
+          maxDistance={120}
+          maxPolarAngle={Math.PI / 2.2}
+          minPolarAngle={0}
           enableRotate={true}
           enableZoom={true}
-          enablePan={true}
+          enablePan={!trackedRobotData}
+          rotateSpeed={0.6}
+          zoomSpeed={1.0}
+          panSpeed={0.8}
+          screenSpacePanning={false}
+          makeDefault={true}
         />
       </Canvas>
 

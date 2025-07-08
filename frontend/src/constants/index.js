@@ -81,4 +81,144 @@ export const MENU_ITEMS = [
   { id: 'map', label: '맵 정보', path: '/map' },
   { id: 'log', label: '로그', path: '/log' },
   { id: 'settings', label: '설정', path: '/settings' }
-]; 
+];
+
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+
+export const WEBSOCKET_URL = import.meta.env.VITE_WEBSOCKET_URL || 'ws://localhost:3000';
+
+// 공통 상태 색상 시스템 (메인 페이지와 타임라인 통일)
+export const STATUS_COLORS = {
+  // 완료/성공 상태
+  COMPLETED: '#22C55E',     // 녹색
+  SUCCESS: '#22C55E',       // 녹색
+  
+  // 진행중 상태  
+  IN_PROGRESS: '#3B82F6',   // 파란색
+  ACTIVE: '#3B82F6',        // 파란색
+  
+  // 대기/시작 전 상태
+  PENDING: '#9CA3AF',       // 회색
+  NOT_STARTED: '#9CA3AF',   // 회색
+  IDLE: '#9CA3AF',          // 회색
+  
+  // 오류/차단/실패 상태
+  ERROR: '#EF4444',         // 빨간색
+  FAILED: '#EF4444',        // 빨간색
+  BLOCKED: '#EF4444',       // 빨간색
+  
+  // 일시정지/충전 상태
+  PAUSED: '#F59E0B',        // 주황색
+  CHARGING: '#F59E0B',      // 주황색
+  
+  // 취소 상태
+  CANCELED: '#6B7280',      // 어두운 회색
+  
+  // 기본 상태
+  DEFAULT: '#6B7280'        // 어두운 회색
+};
+
+// 로봇 상태별 색상 시스템
+export const ROBOT_STATUS_COLORS = {
+  MOVING: '#3B82F6',        // 파란색 (이동중)
+  IDLE: '#22C55E',          // 녹색 (대기)
+  WORKING: '#F59E0B',       // 주황색 (작업중)
+  CHARGING: '#F59E0B',      // 주황색 (충전중)
+  ERROR: '#EF4444',         // 빨간색 (오류)
+  DEFAULT: '#6B7280'        // 회색 (기본)
+};
+
+// 상태별 색상 매핑 함수
+export const getStatusColor = (status, type = 'mission') => {
+  const normalizedStatus = status?.toLowerCase().replace('_', '');
+  
+  // 로봇 상태인 경우
+  if (type === 'robot') {
+    switch (normalizedStatus) {
+      case 'moving':
+        return ROBOT_STATUS_COLORS.MOVING;
+      case 'idle':
+        return ROBOT_STATUS_COLORS.IDLE;
+      case 'working':
+        return ROBOT_STATUS_COLORS.WORKING;
+      case 'charging':
+        return ROBOT_STATUS_COLORS.CHARGING;
+      case 'error':
+        return ROBOT_STATUS_COLORS.ERROR;
+      default:
+        return ROBOT_STATUS_COLORS.DEFAULT;
+    }
+  }
+  
+  // 미션/태스크 상태인 경우
+  switch (normalizedStatus) {
+    case 'completed':
+    case 'success':
+      return STATUS_COLORS.COMPLETED;
+      
+    case 'inprogress':
+    case 'in_progress':
+    case 'active':
+      return STATUS_COLORS.IN_PROGRESS;
+      
+    case 'pending':
+    case 'notstarted':
+    case 'not_started':
+    case 'idle':
+      return STATUS_COLORS.PENDING;
+      
+    case 'error':
+    case 'failed':
+    case 'blocked':
+      return STATUS_COLORS.ERROR;
+      
+    case 'paused':
+    case 'charging':
+      return STATUS_COLORS.PAUSED;
+      
+    case 'canceled':
+    case 'cancelled':
+      return STATUS_COLORS.CANCELED;
+      
+    default:
+      return STATUS_COLORS.DEFAULT;
+  }
+};
+
+// 상태별 아이콘 매핑 함수
+export const getStatusIcon = (status) => {
+  const normalizedStatus = status?.toLowerCase().replace('_', '');
+  
+  switch (normalizedStatus) {
+    case 'completed':
+    case 'success':
+      return 'fas fa-check-circle';
+      
+    case 'inprogress':
+    case 'in_progress':
+    case 'active':
+      return 'fas fa-spinner fa-spin';
+      
+    case 'pending':
+    case 'notstarted':
+    case 'not_started':
+    case 'idle':
+      return 'fas fa-clock';
+      
+    case 'error':
+    case 'failed':
+    case 'blocked':
+      return 'fas fa-exclamation-triangle';
+      
+    case 'paused':
+    case 'charging':
+      return 'fas fa-pause';
+      
+    case 'canceled':
+    case 'cancelled':
+      return 'fas fa-times-circle';
+      
+    default:
+      return 'fas fa-circle';
+  }
+}; 

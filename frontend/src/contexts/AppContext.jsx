@@ -11,6 +11,7 @@ const initialState = {
   connectionStatus: 'connected', // connected, disconnected, connecting
   systemStatus: 'normal', // normal, warning, error
   notifications: [],
+  robots: [], // 로봇 목록
   filters: {
     robotStatus: null,
     missionStatus: null
@@ -31,6 +32,7 @@ const ACTION_TYPES = {
   SET_SYSTEM_STATUS: 'SET_SYSTEM_STATUS',
   ADD_NOTIFICATION: 'ADD_NOTIFICATION',
   REMOVE_NOTIFICATION: 'REMOVE_NOTIFICATION',
+  SET_ROBOTS: 'SET_ROBOTS',
   SET_FILTER: 'SET_FILTER',
   CLEAR_FILTERS: 'CLEAR_FILTERS',
   UPDATE_UI_SETTING: 'UPDATE_UI_SETTING'
@@ -85,6 +87,12 @@ const appReducer = (state, action) => {
         notifications: state.notifications.filter(
           notification => notification.id !== action.payload
         )
+      };
+
+    case ACTION_TYPES.SET_ROBOTS:
+      return {
+        ...state,
+        robots: action.payload
       };
 
     case ACTION_TYPES.SET_FILTER:
@@ -151,6 +159,10 @@ export const AppProvider = ({ children }) => {
 
     removeNotification: (id) => {
       dispatch({ type: ACTION_TYPES.REMOVE_NOTIFICATION, payload: id });
+    },
+
+    setRobots: (robots) => {
+      dispatch({ type: ACTION_TYPES.SET_ROBOTS, payload: robots });
     },
 
     setFilter: (type, value) => {
