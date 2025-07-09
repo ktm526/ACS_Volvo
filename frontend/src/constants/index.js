@@ -78,7 +78,7 @@ export const API_ENDPOINTS = {
 // 메뉴 아이템
 export const MENU_ITEMS = [
   { id: 'main', label: '메인', path: '/' },
-  { id: 'map', label: '맵 정보', path: '/map' },
+  { id: 'video', label: '영상', path: '/video' },
   { id: 'log', label: '로그', path: '/log' },
   { id: 'settings', label: '설정', path: '/settings' }
 ];

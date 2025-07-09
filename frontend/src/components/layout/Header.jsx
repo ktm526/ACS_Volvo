@@ -127,7 +127,7 @@ const Header = () => {
   // 메뉴 아이콘 매핑
   const menuIcons = {
     main: 'fas fa-home',
-    map: 'fas fa-map',
+    video: 'fas fa-video',
     log: 'fas fa-list-alt',
     settings: 'fas fa-cog'
   };

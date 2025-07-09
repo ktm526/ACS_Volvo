@@ -990,7 +990,7 @@ const Scene3D = ({
           <MetroRobot 
             key={robot.id} 
             robot={robot}
-            isSelected={selectedRobot === robot.id}
+            isSelected={trackedRobot ? (selectedRobot === robot.id) : false}
             onHover={handleRobotHover}
             onHoverEnd={handleRobotHoverEnd}
           />

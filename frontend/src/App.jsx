@@ -2,7 +2,7 @@ import React from 'react';
 import { AppProvider, useAppContext } from './contexts/AppContext.jsx';
 import Header from './components/layout/Header';
 import MainPage from './pages/MainPage';
-import MapPage from './pages/MapPage';
+import VideoPage from './pages/VideoPage';
 import LogPage from './pages/LogPage';
 import SettingsPage from './pages/SettingsPage';
 import './App.css';
@@ -14,8 +14,8 @@ const AppContent = () => {
     switch (state.currentPage) {
       case 'main':
         return <MainPage />;
-      case 'map':
-        return <MapPage />;
+      case 'video':
+        return <VideoPage />;
       case 'log':
         return <LogPage />;
       case 'settings':
