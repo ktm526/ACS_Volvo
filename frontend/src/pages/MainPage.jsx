@@ -3,16 +3,19 @@ import Scene3D from '../components/3d/Scene3D';
 import Sidebar from '../components/main/Sidebar';
 import MainViewOverlay from '../components/main/MainViewOverlay';
 import MapControls from '../components/main/MapControls';
-import { useRobots } from '../hooks/useRobots';
-import { useMissions } from '../hooks/useMissions';
-import { useSimulatedData } from '../hooks/useSimulatedData';
 import { useAppContext } from '../contexts/AppContext.jsx';
 import { calculateStats } from '../utils/mainPageUtils';
 
 const MainPage = () => {
-  const { robots, loading: robotsLoading, error: robotsError } = useRobots();
-  const { missions, loading: missionsLoading, error: missionsError } = useMissions();
-  const { state } = useAppContext();
+  const { state, actions } = useAppContext();
+  
+  // 로봇과 미션 데이터 상태
+  const [robots, setRobots] = useState([]);
+  const [missions, setMissions] = useState([]);
+  const [loading, setLoading] = useState({
+    robots: true,
+    missions: true
+  });
 
   const [selectedRobot, setSelectedRobot] = useState(null);
   const [viewMode, setViewMode] = useState('overview');
@@ -23,6 +26,12 @@ const MainPage = () => {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [trackedRobot, setTrackedRobot] = useState(null);
   
+  // 맵 관련 상태
+  const [availableMaps, setAvailableMaps] = useState([]);
+  const [selectedMap, setSelectedMap] = useState(null);
+  const [currentMapData, setCurrentMapData] = useState(null);
+  const [mapLoading, setMapLoading] = useState(false);
+  
   // 최소 로딩 시간 보장을 위한 상태
   const [minLoadingComplete, setMinLoadingComplete] = useState(false);
   const [dataLoadingComplete, setDataLoadingComplete] = useState(false);
@@ -31,15 +40,137 @@ const MainPage = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // 시뮬레이션 데이터 훅 사용
-  const { simulatedRobots, simulatedMissions } = useSimulatedData(liveDataEnabled);
-
-  // 실제 데이터 또는 시뮬레이션 데이터 사용
-  const activeRobots = simulatedRobots || robots || [];
-  const activeMissions = simulatedMissions || missions || [];
+  // 활성 데이터
+  const activeRobots = robots || [];
+  const activeMissions = missions || [];
   
   // 통계 계산
   const stats = calculateStats(activeRobots);
+
+  // API URL 설정
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+  // 로봇 목록 로드
+  const loadRobots = async () => {
+    try {
+      setLoading(prev => ({ ...prev, robots: true }));
+      console.log('로봇 데이터 로딩 시작:', `${API_URL}/api/robots`);
+      
+      const response = await fetch(`${API_URL}/api/robots`);
+      console.log('로봇 API 응답 상태:', response.status);
+      
+      const data = await response.json();
+      console.log('로봇 API 응답 데이터:', data);
+      
+      if (response.ok) {
+        const robotsData = data.data || [];
+        console.log('설정된 로봇 데이터:', robotsData);
+        setRobots(robotsData);
+        // AppContext에도 업데이트
+        actions.setRobots(robotsData);
+      } else {
+        console.error('로봇 API 에러:', data);
+        actions.addNotification && actions.addNotification({
+          type: 'error',
+          message: '로봇 목록을 불러오는데 실패했습니다.'
+        });
+      }
+    } catch (error) {
+      console.error('로봇 목록 가져오기 실패:', error);
+      actions.addNotification && actions.addNotification({
+        type: 'error',
+        message: '서버 연결에 실패했습니다.'
+      });
+    } finally {
+      setLoading(prev => ({ ...prev, robots: false }));
+    }
+  };
+
+  // 미션 목록 로드 (현재 백엔드에 미션 API 없음)
+  const loadMissions = async () => {
+    try {
+      setLoading(prev => ({ ...prev, missions: true }));
+      // 미션 API가 구현되지 않았으므로 빈 배열로 설정
+      console.log('미션 API가 아직 구현되지 않음');
+      setMissions([]);
+    } catch (error) {
+      console.error('미션 목록 가져오기 실패:', error);
+      setMissions([]);
+    } finally {
+      setLoading(prev => ({ ...prev, missions: false }));
+    }
+  };
+
+  // 맵 목록 가져오기
+  const fetchAvailableMaps = async () => {
+    console.log('fetchAvailableMaps: 맵 목록 가져오기 시작');
+    
+    try {
+      const url = `${API_URL}/api/maps`;
+      console.log('fetchAvailableMaps: API 호출', url);
+      
+      const response = await fetch(url);
+      console.log('fetchAvailableMaps: 응답 상태', response.status);
+      
+      if (response.ok) {
+        const maps = await response.json();
+        console.log('fetchAvailableMaps: 맵 목록 로드 완료:', maps);
+        setAvailableMaps(maps);
+        
+        // 첫 번째 맵을 기본 선택
+        if (maps.length > 0 && !selectedMap) {
+          console.log('fetchAvailableMaps: 첫 번째 맵 선택:', maps[0]);
+          setSelectedMap(maps[0]);
+        }
+      } else {
+        console.error('fetchAvailableMaps: 맵 목록을 가져오는데 실패했습니다', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('fetchAvailableMaps: 에러 응답:', errorText);
+      }
+    } catch (error) {
+      console.error('fetchAvailableMaps: 맵 목록 가져오기 실패:', error);
+    }
+  };
+
+  // 맵 데이터 가져오기
+  const fetchMapData = async (mapId) => {
+    if (!mapId) {
+      console.log('fetchMapData: mapId가 없음');
+      return;
+    }
+    
+    console.log('fetchMapData: 맵 데이터 가져오기 시작', mapId);
+    
+    try {
+      setMapLoading(true);
+      const url = `${API_URL}/api/maps/${mapId}/data?sample=1&limit=999999`;
+      console.log('fetchMapData: API 호출', url);
+      
+      const response = await fetch(url);
+      console.log('fetchMapData: 응답 상태', response.status);
+      
+      if (response.ok) {
+        const mapData = await response.json();
+        console.log('fetchMapData: 맵 데이터 로드 완료:', mapData);
+        setCurrentMapData(mapData);
+      } else {
+        console.error('fetchMapData: 맵 데이터를 가져오는데 실패했습니다', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('fetchMapData: 에러 응답:', errorText);
+      }
+    } catch (error) {
+      console.error('fetchMapData: 맵 데이터 가져오기 실패:', error);
+    } finally {
+      setMapLoading(false);
+    }
+  };
+
+  // 맵 선택 핸들러
+  const handleMapSelect = (map) => {
+    setSelectedMap(map);
+    setCurrentMapData(null);
+    fetchMapData(map.id);
+  };
 
   // 화면 크기 감지
   useEffect(() => {
@@ -84,12 +215,26 @@ const MainPage = () => {
     return () => clearTimeout(minLoadingTimer);
   }, []);
 
+  // 컴포넌트 마운트 시 데이터 가져오기
+  useEffect(() => {
+    loadRobots();
+    loadMissions();
+    fetchAvailableMaps();
+  }, []);
+
+  // 선택된 맵이 변경될 때 맵 데이터 가져오기
+  useEffect(() => {
+    if (selectedMap) {
+      fetchMapData(selectedMap.id);
+    }
+  }, [selectedMap]);
+
   // 실제 데이터 로딩 상태 체크
   useEffect(() => {
-    if (!robotsLoading && !missionsLoading) {
+    if (!loading.robots && !loading.missions) {
       setDataLoadingComplete(true);
     }
-  }, [robotsLoading, missionsLoading]);
+  }, [loading.robots, loading.missions]);
 
   // 최소 로딩 시간과 데이터 로딩 둘 다 완료되어야 로딩 끝
   const isLoading = !minLoadingComplete || !dataLoadingComplete;
@@ -403,6 +548,8 @@ const MainPage = () => {
                 showLabels={true}
                 zoomLevel={zoomLevel}
                 trackedRobot={trackedRobot}
+                mapData={currentMapData}
+                showMapData={!!currentMapData}
               />
               <MainViewOverlay stats={stats} />
               <MapControls
@@ -413,6 +560,10 @@ const MainPage = () => {
                 viewMode={viewMode}
                 trackedRobot={trackedRobot}
                 zoomLevel={zoomLevel}
+                availableMaps={availableMaps}
+                selectedMap={selectedMap}
+                onMapSelect={handleMapSelect}
+                mapLoading={mapLoading}
               />
             </>
           )}

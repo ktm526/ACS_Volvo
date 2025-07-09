@@ -8,10 +8,15 @@ const MapControls = ({
   viewMode = 'overview',
   trackedRobot = null,
   zoomLevel = 1,
-  className = ''
+  className = '',
+  availableMaps = [],
+  selectedMap = null,
+  onMapSelect,
+  mapLoading = false
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showRobotList, setShowRobotList] = useState(false);
+  const [showMapList, setShowMapList] = useState(false);
   const controlsRef = useRef(null);
 
   // 외부 클릭 시 닫기
@@ -19,6 +24,7 @@ const MapControls = ({
     const handleClickOutside = (event) => {
       if (controlsRef.current && !controlsRef.current.contains(event.target)) {
         setShowRobotList(false);
+        setShowMapList(false);
       }
     };
 
@@ -46,6 +52,11 @@ const MapControls = ({
   const handleRobotSelect = (robotId) => {
     onRobotTrack?.(robotId === trackedRobot ? null : robotId);
     setShowRobotList(false);
+  };
+
+  const handleMapSelect = (map) => {
+    onMapSelect?.(map);
+    setShowMapList(false);
   };
 
   const getViewModeIcon = () => {
@@ -136,6 +147,149 @@ const MapControls = ({
         {/* 확장된 컨트롤들 */}
         {isExpanded && (
           <>
+            {/* 맵 선택 */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-sm)',
+              marginBottom: 'var(--space-sm)',
+              padding: '8px 0',
+              borderBottom: '1px solid var(--border-primary)',
+              position: 'relative'
+            }}>
+              <div style={{
+                fontSize: '11px',
+                color: 'var(--text-secondary)',
+                fontWeight: '600',
+                minWidth: '40px'
+              }}>
+                맵:
+              </div>
+              <button
+                onClick={() => setShowMapList(!showMapList)}
+                disabled={mapLoading}
+                style={{
+                  background: 'linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary))',
+                  border: '1px solid var(--border-primary)',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  color: 'var(--text-primary)',
+                  fontSize: '11px',
+                  fontWeight: '600',
+                  cursor: mapLoading ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-xs)',
+                  minWidth: '120px',
+                  justifyContent: 'space-between',
+                  opacity: mapLoading ? 0.6 : 1
+                }}
+                onMouseEnter={(e) => {
+                  if (!mapLoading) {
+                    e.target.style.background = 'linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary))';
+                    e.target.style.transform = 'translateY(-1px)';
+                    e.target.style.boxShadow = '0 4px 12px rgba(0, 212, 255, 0.2)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!mapLoading) {
+                    e.target.style.background = 'linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary))';
+                    e.target.style.transform = 'translateY(0)';
+                    e.target.style.boxShadow = 'none';
+                  }
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
+                  <i className="fas fa-map" style={{ fontSize: '10px' }}></i>
+                  <span style={{ 
+                    whiteSpace: 'nowrap', 
+                    overflow: 'hidden', 
+                    textOverflow: 'ellipsis',
+                    maxWidth: '80px'
+                  }}>
+                    {mapLoading ? '로딩...' : selectedMap?.name || '맵 선택'}
+                  </span>
+                </div>
+                <i className={`fas fa-chevron-${showMapList ? 'up' : 'down'}`} style={{ fontSize: '10px' }}></i>
+              </button>
+              
+              {/* 맵 드롭다운 */}
+              {showMapList && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: '48px',
+                  right: 0,
+                  background: 'rgba(0, 0, 0, 0.9)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid var(--border-primary)',
+                  borderRadius: '8px',
+                  padding: 'var(--space-xs)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+                  zIndex: 1001,
+                  marginTop: '4px',
+                  maxHeight: '200px',
+                  overflowY: 'auto'
+                }}>
+                  {availableMaps.length > 0 ? (
+                    availableMaps.map((map) => (
+                      <button
+                        key={map.id}
+                        onClick={() => handleMapSelect(map)}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          background: selectedMap?.id === map.id ? 'var(--primary-color)20' : 'transparent',
+                          border: selectedMap?.id === map.id ? '1px solid var(--primary-color)' : '1px solid transparent',
+                          borderRadius: '6px',
+                          color: 'var(--text-primary)',
+                          fontSize: '11px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          textAlign: 'left',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 'var(--space-xs)',
+                          marginBottom: '2px'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = 'var(--primary-color)30';
+                          e.target.style.borderColor = 'var(--primary-color)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = selectedMap?.id === map.id ? 'var(--primary-color)20' : 'transparent';
+                          e.target.style.borderColor = selectedMap?.id === map.id ? 'var(--primary-color)' : 'transparent';
+                        }}
+                      >
+                        <i className="fas fa-map" style={{ fontSize: '10px' }}></i>
+                        <span style={{ 
+                          whiteSpace: 'nowrap', 
+                          overflow: 'hidden', 
+                          textOverflow: 'ellipsis',
+                          flex: 1
+                        }}>
+                          {map.name}
+                        </span>
+                        {selectedMap?.id === map.id && (
+                          <i className="fas fa-check" style={{ fontSize: '10px', color: 'var(--primary-color)' }}></i>
+                        )}
+                      </button>
+                    ))
+                  ) : (
+                    <div style={{
+                      padding: '8px 12px',
+                      fontSize: '11px',
+                      color: 'var(--text-tertiary)',
+                      textAlign: 'center'
+                    }}>
+                      사용 가능한 맵이 없습니다
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
             {/* 뷰 모드 전환 */}
             <div style={{
               display: 'flex',

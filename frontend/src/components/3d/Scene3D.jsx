@@ -4,6 +4,7 @@ import { OrbitControls, Html, Line } from '@react-three/drei';
 import { createPortal } from 'react-dom';
 import { STATIONS, PATHS } from '../../constants';
 import * as THREE from 'three';
+import MapRenderer3D from './MapRenderer3D';
 
 // 카메라 애니메이션 컴포넌트
 function CameraController({ viewMode, zoomLevel, trackedRobot, duration = 1.0 }) {
@@ -40,8 +41,8 @@ function CameraController({ viewMode, zoomLevel, trackedRobot, duration = 1.0 })
     // 목표 설정 계산
     let targetDistance, targetPolar, targetAzimuth, targetTarget;
 
-    // 줌 레벨에 따른 거리 계산 (20~100 범위)
-    targetDistance = 20 + (3 - zoomLevel) * 30; // zoomLevel 3일 때 20, 0.5일 때 95
+    // 줌 레벨에 따른 거리 계산 (8~50 범위) - 맵 데이터에 맞게 조정
+    targetDistance = 8 + (3 - zoomLevel) * 17; // zoomLevel 3일 때 8, 0.5일 때 50.5
 
     // 뷰 모드에 따른 극각 계산
     if (viewMode === 'overview') {
@@ -134,7 +135,7 @@ function CameraController({ viewMode, zoomLevel, trackedRobot, duration = 1.0 })
   return null;
 }
 
-// 미래적인 색상 팔레트
+// 사이드바와 통일된 색상 팔레트
 const METRO_COLORS = {
   // 주요 노선 색상
   line1: '#FF0040',      // 빨간선 (네온 레드)
@@ -143,11 +144,12 @@ const METRO_COLORS = {
   line4: '#FF8000',      // 주황선 (네온 오렌지)
   line5: '#8000FF',      // 보라선 (네온 퍼플)
   
-  // 상태 색상
-  active: '#00FFFF',     // 활성 상태 (시아노)
-  idle: '#FFFF00',       // 대기 상태 (옐로우)
-  charging: '#FF4080',   // 충전 중 (핑크)
-  error: '#FF0000',      // 오류 (빨간색)
+  // 로봇 상태 색상 (사이드바와 통일)
+  moving: '#3B82F6',     // 이동중 (파란색)
+  idle: '#22C55E',       // 대기 (녹색)
+  charging: '#F59E0B',   // 충전중 (주황색)
+  error: '#EF4444',      // 오류 (빨간색)
+  working: '#F59E0B',    // 작업중 (주황색)
   
   // 스테이션 타입 색상
   station: '#40FF80',    // 일반 스테이션
@@ -316,7 +318,7 @@ function MetroLine({ line, isActive = false }) {
   }
 }
 
-// 스테이션 컴포넌트
+// 스테이션 컴포넌트 (원형 테 제거)
 function MetroStation({ station, isSelected = false }) {
   const [isHovered, setIsHovered] = useState(false);
   
@@ -326,38 +328,13 @@ function MetroStation({ station, isSelected = false }) {
   
   return (
     <group position={[station.x, 0, station.y]}>
-      {/* 스테이션 외곽 고리 */}
+      {/* 중앙 점만 남김 */}
       <mesh 
-        position={[0, 0.02, 0]} 
+        position={[0, 0.03, 0]} 
         rotation={[-Math.PI / 2, 0, 0]}
         onPointerEnter={() => setIsHovered(true)}
         onPointerLeave={() => setIsHovered(false)}
       >
-        <ringGeometry args={[0.6, 0.9, 32]} />
-        <meshBasicMaterial
-          color={stationColor}
-          transparent
-          opacity={0.8}
-        />
-      </mesh>
-      
-      {/* 스테이션 내부 고리 */}
-      <mesh 
-        position={[0, 0.01, 0]} 
-        rotation={[-Math.PI / 2, 0, 0]}
-        onPointerEnter={() => setIsHovered(true)}
-        onPointerLeave={() => setIsHovered(false)}
-      >
-        <ringGeometry args={[0.4, 0.6, 32]} />
-        <meshBasicMaterial
-          color={stationColor}
-          transparent
-          opacity={0.5}
-        />
-      </mesh>
-      
-      {/* 중앙 점 */}
-      <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[0.15, 16]} />
         <meshBasicMaterial
           color={stationColor}
@@ -365,18 +342,6 @@ function MetroStation({ station, isSelected = false }) {
           opacity={0.9}
         />
       </mesh>
-      
-      {/* 글로우 효과 */}
-      {isSelected && (
-        <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.9, 1.2, 32]} />
-          <meshBasicMaterial
-            color={METRO_COLORS.glow}
-            transparent
-            opacity={0.3}
-          />
-        </mesh>
-      )}
       
       {/* 스테이션 정보 - 호버시에만 표시 */}
       {isHovered && (
@@ -406,13 +371,61 @@ function MetroStation({ station, isSelected = false }) {
 // 로봇 컴포넌트
 function MetroRobot({ robot, isSelected = false, onHover, onHoverEnd }) {
   const meshRef = useRef();
+  const pulseRef = useRef();
+  const pulseRef2 = useRef();
   const { camera, gl } = useThree();
   const [isHovered, setIsHovered] = useState(false);
   
-  const statusColor = robot.status === 'moving' ? METRO_COLORS.active :
-                     robot.status === 'charging' ? METRO_COLORS.charging :
-                     robot.status === 'error' ? METRO_COLORS.error :
-                     METRO_COLORS.idle;
+  // 사이드바와 동일한 상태 색상 매핑
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'moving': return METRO_COLORS.moving;
+      case 'charging': return METRO_COLORS.charging;
+      case 'error': return METRO_COLORS.error;
+      case 'working': return METRO_COLORS.working;
+      case 'idle':
+      default: return METRO_COLORS.idle;
+    }
+  };
+  
+  const statusColor = getStatusColor(robot.status);
+
+  // 레이더 스캔 효과 (강화됨)
+  useFrame((state) => {
+    const time = state.clock.elapsedTime;
+    
+    if (pulseRef.current) {
+      // 첫 번째 레이더 웨이브 (중심에서 바깥으로 퍼져나감)
+      const wave1Progress = (time * 1.5) % 3; // 3초마다 반복
+      const scale1 = 0.1 + wave1Progress * 0.6; // 더 크게 확장
+      const opacity1 = Math.max(0, 0.8 - wave1Progress * 0.25); // 더 진한 시작점
+      
+      pulseRef.current.scale.setScalar(scale1);
+      pulseRef.current.material.opacity = opacity1;
+    }
+    
+    if (pulseRef2.current) {
+      // 두 번째 레이더 웨이브 (첫 번째와 1초 차이)
+      const wave2Progress = ((time * 1.5) + 1.5) % 3; // 1.5초 지연
+      const scale2 = 0.1 + wave2Progress * 0.5;
+      const opacity2 = Math.max(0, 0.6 - wave2Progress * 0.2); // 더 진한 시작점
+      
+      pulseRef2.current.scale.setScalar(scale2);
+      pulseRef2.current.material.opacity = opacity2;
+    }
+    
+    // 선택된 로봇은 더 빠른 스캔
+    if (isSelected) {
+      if (pulseRef.current) {
+        const fastWave = (time * 2.5) % 3;
+        const fastScale = 0.1 + fastWave * 0.8; // 선택시 더 크게
+        const fastOpacity = Math.max(0, 0.9 - fastWave * 0.3); // 선택시 더 진하게
+        
+        pulseRef.current.scale.setScalar(fastScale);
+        pulseRef.current.material.opacity = fastOpacity;
+      }
+    }
+  });
 
   useEffect(() => {
     const updateTooltipPosition = () => {
@@ -463,97 +476,70 @@ function MetroRobot({ robot, isSelected = false, onHover, onHoverEnd }) {
     console.log(`Pointer leave on robot ${robot.id}`);
     setIsHovered(false);
   }, [robot.id]);
-
-  // 툴팁 내용 생성 - 임시 비활성화
-  /* const tooltipContent = `
-    <div style="text-align: left; font-family: 'Pretendard', sans-serif;">
-      <div style="font-size: 16px; font-weight: bold; margin-bottom: 8px; color: #ffffff;">
-        ${robot.name || robot.id}
-      </div>
-      <div style="font-size: 12px; color: #cccccc; margin-bottom: 12px;">
-        ${robot.id}
-      </div>
-      <div style="font-size: 14px; margin-bottom: 8px; color: #e5e5e5;">
-        ${robot.currentMission || '상태 정보 없음'}
-      </div>
-      <div style="font-size: 12px; color: #cccccc;">
-        <div>위치: (${robot.location_x || 0}, ${robot.location_y || 0})</div>
-        ${robot.destination ? `<div>목적지: ${robot.destination}</div>` : ''}
-        ${robot.speed > 0 ? `<div>속도: ${robot.speed} m/s</div>` : ''}
-        <div>배터리: ${robot.battery || 0}%</div>
-      </div>
-    </div>
-  `; */
   
   return (
-    <group position={[robot.location_x, 0, robot.location_y]}>
-      {/* 로봇 바닥 원 (상태별 색상) */}
+    <group position={[robot.location_x, 0.1, robot.location_y]}>
+      {/* 첫 번째 레이더 웨이브 링 (로봇 높이 중간) - 글로우 효과 */}
       <mesh 
-        position={[0, 0.1, 0]} 
+        ref={pulseRef}
+        position={[0, 0.05, 0]} 
         rotation={[-Math.PI / 2, 0, 0]}
-        onPointerEnter={handlePointerEnter}
-        onPointerLeave={handlePointerLeave}
       >
-        <circleGeometry args={[1, 16]} />
-        <meshBasicMaterial
+        <ringGeometry args={[0.1, 0.2, 32]} />
+        <meshStandardMaterial
           color={statusColor}
+          emissive={statusColor}
+          emissiveIntensity={0.5}
+          transparent
+          opacity={0.8}
+        />
+      </mesh>
+      
+      {/* 두 번째 레이더 웨이브 링 (로봇 높이 중간) - 글로우 효과 */}
+      <mesh 
+        ref={pulseRef2}
+        position={[0, 0.06, 0]} 
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
+        <ringGeometry args={[0.05, 0.08, 32]} />
+        <meshStandardMaterial
+          color={statusColor}
+          emissive={statusColor}
+          emissiveIntensity={0.4}
           transparent
           opacity={0.6}
         />
       </mesh>
       
-      {/* 로봇 본체 (통일된 색상) */}
+      {/* 로봇 본체 (구 형태, 1/10 크기) */}
       <mesh 
         ref={meshRef}
-        position={[0, 0.5, 0]}
+        position={[0, 0.1, 0]}
         onPointerEnter={handlePointerEnter}
         onPointerLeave={handlePointerLeave}
       >
-        <boxGeometry args={[1, 1, 1]} />
+        <sphereGeometry args={[0.1, 16, 16]} />
         <meshStandardMaterial
-          color={METRO_COLORS.robot}
-          emissive={METRO_COLORS.robot}
-          emissiveIntensity={0.2}
-          metalness={0.8}
+          color={statusColor}
+          emissive={statusColor}
+          emissiveIntensity={0.4}
+          metalness={0.7}
           roughness={0.2}
         />
       </mesh>
       
-      {/* 상태 인디케이터 */}
-      <mesh 
-        position={[0, 1, 0]}
-        onPointerEnter={handlePointerEnter}
-        onPointerLeave={handlePointerLeave}
-      >
-        <sphereGeometry args={[0.15, 16, 16]} />
-        <meshBasicMaterial
-          color={statusColor}
-          transparent
-          opacity={robot.status === 'moving' ? 1 : 0.7}
-        />
-      </mesh>
-      
-      {/* 선택 표시 */}
+      {/* 선택 표시 - 강화된 글로우 */}
       {isSelected && (
-        <>
-          <mesh position={[0, 0.1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[1.2, 1.8, 32]} />
-            <meshBasicMaterial
-              color={METRO_COLORS.glow}
-              transparent
-              opacity={0.6}
-            />
-          </mesh>
-          
-          <mesh position={[0, 0.1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[1.8, 2.2, 32]} />
-            <meshBasicMaterial
-              color={METRO_COLORS.glow}
-              transparent
-              opacity={0.3}
-            />
-          </mesh>
-        </>
+        <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.25, 0.3, 32]} />
+          <meshStandardMaterial
+            color={statusColor}
+            emissive={statusColor}
+            emissiveIntensity={0.8}
+            transparent
+            opacity={0.9}
+          />
+        </mesh>
       )}
     </group>
   );
@@ -669,14 +655,17 @@ function ConnectionPath({ path }) {
 function MetroGrid() {
   return (
     <group>
-      {/* 메인 바닥 */}
+      {/* 메인 바닥 - 맵 크기에 맞게 확대 */}
       <mesh position={[0, -0.1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[80, 80]} />
+        <planeGeometry args={[800, 800]} />
         <meshBasicMaterial color={METRO_COLORS.background} />
       </mesh>
       
-      {/* 단순한 그리드 라인 */}
-      <gridHelper args={[80, 16, METRO_COLORS.grid, METRO_COLORS.grid]} opacity={0.8} />
+      {/* 더 촘촘한 그리드 라인 (10배 더 세밀) */}
+      <gridHelper args={[800, 400, METRO_COLORS.grid, METRO_COLORS.grid]} opacity={0.6} />
+      
+      {/* 보조 미세 그리드 (더 촘촘한 격자) */}
+      <gridHelper args={[800, 1600, '#2a2a3a', '#2a2a3a']} opacity={0.3} />
     </group>
   );
 }
@@ -685,10 +674,19 @@ function MetroGrid() {
 function FixedTooltip({ robot, position, visible }) {
   if (!visible || !position || !robot) return null;
 
-  const statusColor = robot.status === 'moving' ? METRO_COLORS.active :
-                     robot.status === 'charging' ? METRO_COLORS.charging :
-                     robot.status === 'error' ? METRO_COLORS.error :
-                     METRO_COLORS.idle;
+  // 사이드바와 동일한 상태 색상 매핑
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'moving': return METRO_COLORS.moving;
+      case 'charging': return METRO_COLORS.charging;
+      case 'error': return METRO_COLORS.error;
+      case 'working': return METRO_COLORS.working;
+      case 'idle':
+      default: return METRO_COLORS.idle;
+    }
+  };
+
+  const statusColor = getStatusColor(robot.status);
 
   const safeBattery = robot.battery || 0;
   const safeName = robot.name || robot.id || 'Unknown';
@@ -875,72 +873,15 @@ const Scene3D = ({
   showGrid = true,
   showLabels = false,
   zoomLevel = 1,
-  trackedRobot = null
+  trackedRobot = null,
+  mapData = null,
+  showMapData = false
 }) => {
   const [activeLines, setActiveLines] = useState(['line1', 'line2']);
   const [tooltipData, setTooltipData] = useState({ robot: null, position: null, visible: false });
   
-  // 고정된 로봇 데이터 (위치 변하지 않음)
-  const FIXED_ROBOTS = [
-    { 
-      id: 'Robot-001', 
-      name: 'AGV-Alpha', 
-      location_x: -10, 
-      location_y: 0, 
-      status: 'moving', 
-      battery: 85,
-      currentMission: '물류센터에서 작업장1로 부품 운송',
-      destination: '작업장1',
-      speed: 2.3
-    },
-    { 
-      id: 'Robot-002', 
-      name: 'AGV-Beta', 
-      location_x: 0, 
-      location_y: -10, 
-      status: 'charging', 
-      battery: 15,
-      currentMission: '충전소에서 배터리 충전 중',
-      destination: '충전소A',
-      speed: 0
-    },
-    { 
-      id: 'Robot-003', 
-      name: 'AGV-Gamma', 
-      location_x: 5, 
-      location_y: 5, 
-      status: 'idle', 
-      battery: 67,
-      currentMission: '작업 대기 중',
-      destination: null,
-      speed: 0
-    },
-    { 
-      id: 'Robot-004', 
-      name: 'AGV-Delta', 
-      location_x: 10, 
-      location_y: -5, 
-      status: 'moving', 
-      battery: 92,
-      currentMission: '특수작업장에서 정비소로 장비 이동',
-      destination: '정비소',
-      speed: 1.8
-    },
-    { 
-      id: 'Robot-005', 
-      name: 'AGV-Echo', 
-      location_x: -5, 
-      location_y: 8, 
-      status: 'error', 
-      battery: 43,
-      currentMission: '시스템 오류 - 점검 필요',
-      destination: null,
-      speed: 0
-    }
-  ];
-  
-  // 항상 고정된 데이터 사용
-  const activeRobots = FIXED_ROBOTS;
+  // 서버에서 받은 실제 로봇 데이터 사용
+  const activeRobots = robots || [];
 
   // 추적 중인 로봇 찾기
   const trackedRobotData = activeRobots.find(robot => robot.id === trackedRobot);
@@ -950,9 +891,11 @@ const Scene3D = ({
     console.log('Scene3D props updated:', { 
       viewMode, 
       zoomLevel, 
-      trackedRobot: trackedRobotData?.id 
+      trackedRobot: trackedRobotData?.id,
+      showMapData,
+      mapData: mapData ? { id: mapData.map?.id, name: mapData.map?.name } : null
     });
-  }, [viewMode, zoomLevel, trackedRobotData]);
+  }, [viewMode, zoomLevel, trackedRobotData, showMapData, mapData]);
 
   const handleRobotHover = useCallback((robot, position) => {
     console.log(`Main component - Robot ${robot.id} hover with position:`, position);
@@ -979,6 +922,13 @@ const Scene3D = ({
           near: 0.1,
           far: 200
         }}
+        gl={{
+          antialias: true,
+          alpha: true,
+          powerPreference: "high-performance",
+          stencil: false,
+          depth: true
+        }}
         style={{ 
           width: '100%', 
           height: '100%',
@@ -994,31 +944,46 @@ const Scene3D = ({
         {/* 배경 그리드 */}
         {showGrid && <MetroGrid />}
 
-        {/* 지하철 노선들 */}
-        {showPaths && METRO_LINES.map(line => (
-          <MetroLine 
-            key={line.id} 
-            line={line} 
-            isActive={activeLines.includes(line.id)}
+        {/* 맵 데이터가 있을 때는 실제 맵 렌더링, 없을 때는 기본 지하철 노선도 */}
+        {showMapData && mapData ? (
+          <MapRenderer3D 
+            mapData={mapData}
+            showTexture={true}
+            showNodes={true}
+            showConnections={true}
+            selectedNode={null}
+            onNodeHover={null}
+            onNodeHoverEnd={null}
           />
-        ))}
+        ) : (
+          <>
+            {/* 지하철 노선들 */}
+            {showPaths && METRO_LINES.map(line => (
+              <MetroLine 
+                key={line.id} 
+                line={line} 
+                isActive={activeLines.includes(line.id)}
+              />
+            ))}
 
-        {/* 연결 경로 */}
-        {showPaths && CONNECTION_PATHS.map((path, index) => (
-          <ConnectionPath 
-            key={`connection-${index}`}
-            path={path}
-          />
-        ))}
+            {/* 연결 경로 */}
+            {showPaths && CONNECTION_PATHS.map((path, index) => (
+              <ConnectionPath 
+                key={`connection-${index}`}
+                path={path}
+              />
+            ))}
 
-        {/* 스테이션들 */}
-        {showStations && METRO_STATIONS.map(station => (
-          <MetroStation 
-            key={station.id} 
-            station={station}
-            isSelected={false}
-          />
-        ))}
+            {/* 스테이션들 */}
+            {showStations && METRO_STATIONS.map(station => (
+              <MetroStation 
+                key={station.id} 
+                station={station}
+                isSelected={false}
+              />
+            ))}
+          </>
+        )}
 
         {/* 로봇들 */}
         {activeRobots.map(robot => (

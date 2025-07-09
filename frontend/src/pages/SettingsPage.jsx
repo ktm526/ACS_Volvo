@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../contexts/AppContext.jsx';
 import RobotManagementSection from '../components/settings/RobotManagementSection.jsx';
+import * as yaml from 'js-yaml';
 
 const SettingsPage = () => {
   const { state, actions } = useAppContext();
   const [localSettings, setLocalSettings] = useState({
     // 맵 관리 관련 상태
-    mapFile: null,
-    mapFileName: '',
+    extractedMapName: '',
+    imageFile: null,
+    metadataFile: null,
+    nodesFile: null,
     selectedRobotMaps: {} // 로봇별 맵 목록 저장
   });
 
@@ -25,27 +28,24 @@ const SettingsPage = () => {
   const fetchServerMaps = async () => {
     setLoading(prev => ({ ...prev, maps: true }));
     try {
-      // 실제 API 호출
       const response = await fetch(`${API_URL}/api/maps`);
       if (response.ok) {
         const maps = await response.json();
         setServerMaps(maps);
       } else {
-        // API 실패 시 임시 데이터 사용
-        setServerMaps([
-          { id: 'map001', name: '1층 작업공간', size: '2.3MB', lastModified: '2024-01-15' },
-          { id: 'map002', name: '2층 작업공간', size: '1.8MB', lastModified: '2024-01-14' },
-          { id: 'map003', name: '창고 A동', size: '3.1MB', lastModified: '2024-01-13' }
-        ]);
+        actions.addNotification({
+          type: 'error',
+          message: '맵 목록을 불러오는데 실패했습니다.'
+        });
+        setServerMaps([]);
       }
     } catch (error) {
       console.error('맵 목록 가져오기 실패:', error);
-      // 에러 시 임시 데이터 사용
-      setServerMaps([
-        { id: 'map001', name: '1층 작업공간', size: '2.3MB', lastModified: '2024-01-15' },
-        { id: 'map002', name: '2층 작업공간', size: '1.8MB', lastModified: '2024-01-14' },
-        { id: 'map003', name: '창고 A동', size: '3.1MB', lastModified: '2024-01-13' }
-      ]);
+      actions.addNotification({
+        type: 'error',
+        message: '서버 연결에 실패했습니다.'
+      });
+      setServerMaps([]);
     } finally {
       setLoading(prev => ({ ...prev, maps: false }));
     }
@@ -155,23 +155,195 @@ const SettingsPage = () => {
     setLocalSettings(prev => ({ ...prev, [setting]: value }));
   };
 
-  const handleFileUpload = (event) => {
+  const extractMapNameFromMetadata = (metadataContent) => {
+    if (!metadataContent || !metadataContent.image) {
+      return '';
+    }
+    
+    const imageName = metadataContent.image;
+    // .pgm, .jpg, .png, .jpeg 등의 확장자를 제거
+    const mapName = imageName.replace(/\.(pgm|jpg|jpeg|png)$/i, '');
+    return mapName;
+  };
+
+  const handleFileUpload = (fileType, event) => {
     const file = event.target.files[0];
     if (file) {
       setLocalSettings(prev => ({
         ...prev,
-        mapFile: file,
-        mapFileName: file.name
+        [fileType]: file
       }));
+
+      // 메타데이터 파일인 경우 자동으로 맵 이름 추출
+      if (fileType === 'metadataFile') {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const yamlContent = yaml.load(e.target.result);
+            const extractedName = extractMapNameFromMetadata(yamlContent);
+            setLocalSettings(prev => ({
+              ...prev,
+              extractedMapName: extractedName
+            }));
+          } catch (error) {
+            console.error('YAML 파싱 오류:', error);
+            actions.addNotification({
+              type: 'error',
+              message: 'YAML 파일을 읽는 중 오류가 발생했습니다.'
+            });
+          }
+        };
+        reader.readAsText(file);
+      }
     }
   };
 
-  const removeMapFile = () => {
-    setLocalSettings(prev => ({
-      ...prev,
-      mapFile: null,
-      mapFileName: ''
-    }));
+  const removeMapFile = (fileType) => {
+    setLocalSettings(prev => {
+      const newSettings = {
+        ...prev,
+        [fileType]: null
+      };
+      
+      // 메타데이터 파일 제거 시 추출된 맵 이름도 초기화
+      if (fileType === 'metadataFile') {
+        newSettings.extractedMapName = '';
+      }
+      
+      return newSettings;
+    });
+  };
+
+  const handleMapUpload = async () => {
+    if (!localSettings.metadataFile && !localSettings.extractedMapName.trim()) {
+      actions.addNotification({
+        type: 'error',
+        message: '메타데이터 파일이 없으면 맵 이름을 자동으로 추출할 수 없습니다.'
+      });
+      return;
+    }
+
+    if (!localSettings.imageFile && !localSettings.metadataFile && !localSettings.nodesFile) {
+      actions.addNotification({
+        type: 'error',
+        message: '최소한 하나의 파일을 업로드해야 합니다.'
+      });
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('name', localSettings.extractedMapName);
+      
+      if (localSettings.imageFile) {
+        formData.append('image', localSettings.imageFile);
+      }
+      if (localSettings.metadataFile) {
+        formData.append('metadata', localSettings.metadataFile);
+      }
+      if (localSettings.nodesFile) {
+        formData.append('nodes', localSettings.nodesFile);
+      }
+
+      const response = await fetch(`${API_URL}/api/maps`, {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        actions.addNotification({
+          type: 'success',
+          message: '맵이 성공적으로 업로드되었습니다.'
+        });
+        
+        // 입력 필드 초기화
+        setLocalSettings(prev => ({
+          ...prev,
+          extractedMapName: '',
+          imageFile: null,
+          metadataFile: null,
+          nodesFile: null
+        }));
+        
+        // 맵 목록 새로고침
+        fetchServerMaps();
+      } else {
+        actions.addNotification({
+          type: 'error',
+          message: data.error || '맵 업로드에 실패했습니다.'
+        });
+      }
+    } catch (error) {
+      console.error('맵 업로드 에러:', error);
+      actions.addNotification({
+        type: 'error',
+        message: '서버 연결에 실패했습니다.'
+      });
+    }
+  };
+
+  const handleMapDownload = async (mapId, fileType) => {
+    try {
+      const response = await fetch(`${API_URL}/api/maps/${mapId}/download/${fileType}`);
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `map_${mapId}_${fileType}`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        actions.addNotification({
+          type: 'error',
+          message: '파일 다운로드에 실패했습니다.'
+        });
+      }
+    } catch (error) {
+      console.error('파일 다운로드 에러:', error);
+      actions.addNotification({
+        type: 'error',
+        message: '서버 연결에 실패했습니다.'
+      });
+    }
+  };
+
+  const handleMapDelete = async (mapId) => {
+    if (!confirm('정말로 이 맵을 삭제하시겠습니까?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/api/maps/${mapId}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        actions.addNotification({
+          type: 'success',
+          message: '맵이 성공적으로 삭제되었습니다.'
+        });
+        fetchServerMaps();
+      } else {
+        actions.addNotification({
+          type: 'error',
+          message: data.error || '맵 삭제에 실패했습니다.'
+        });
+      }
+    } catch (error) {
+      console.error('맵 삭제 에러:', error);
+      actions.addNotification({
+        type: 'error',
+        message: '서버 연결에 실패했습니다.'
+      });
+    }
   };
 
   const handleViewRobotMaps = async (robotId) => {
@@ -222,8 +394,10 @@ const SettingsPage = () => {
 
   const resetSettings = () => {
     const defaultSettings = {
-      mapFile: null,
-      mapFileName: '',
+      extractedMapName: '',
+      imageFile: null,
+      metadataFile: null,
+      nodesFile: null,
       selectedRobotMaps: {}
     };
     setLocalSettings(defaultSettings);
@@ -303,28 +477,62 @@ const SettingsPage = () => {
                               {map.name}
                             </div>
                             <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>
-                              {map.size} • 수정됨: {map.lastModified}
+                              생성일: {new Date(map.created_at).toLocaleDateString()}
                             </div>
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
+                          {map.image_file && (
+                            <button
+                              onClick={() => handleMapDownload(map.id, 'image')}
+                              className="control-btn"
+                              style={{ 
+                                fontSize: 'var(--font-size-xs)', 
+                                padding: 'var(--space-xs) var(--space-sm)',
+                                minWidth: 'unset'
+                              }}
+                              title="이미지 다운로드"
+                            >
+                              <i className="fas fa-image"></i>
+                            </button>
+                          )}
+                          {map.metadata_file && (
+                            <button
+                              onClick={() => handleMapDownload(map.id, 'metadata')}
+                              className="control-btn"
+                              style={{ 
+                                fontSize: 'var(--font-size-xs)', 
+                                padding: 'var(--space-xs) var(--space-sm)',
+                                minWidth: 'unset'
+                              }}
+                              title="메타데이터 다운로드"
+                            >
+                              <i className="fas fa-file-code"></i>
+                            </button>
+                          )}
+                          {map.node_file && (
+                            <button
+                              onClick={() => handleMapDownload(map.id, 'nodes')}
+                              className="control-btn"
+                              style={{ 
+                                fontSize: 'var(--font-size-xs)', 
+                                padding: 'var(--space-xs) var(--space-sm)',
+                                minWidth: 'unset'
+                              }}
+                              title="노드 다운로드"
+                            >
+                              <i className="fas fa-project-diagram"></i>
+                            </button>
+                          )}
                           <button
+                            onClick={() => handleMapDelete(map.id)}
                             className="control-btn"
-                            style={{ 
+                  style={{ 
                               fontSize: 'var(--font-size-xs)', 
                               padding: 'var(--space-xs) var(--space-sm)',
                               minWidth: 'unset'
-                            }}
-                          >
-                            <i className="fas fa-download"></i>
-                          </button>
-                          <button
-                            className="control-btn"
-                            style={{ 
-                              fontSize: 'var(--font-size-xs)', 
-                              padding: 'var(--space-xs) var(--space-sm)',
-                              minWidth: 'unset'
-                            }}
+                  }}
+                            title="맵 삭제"
                           >
                             <i className="fas fa-trash"></i>
                           </button>
@@ -356,58 +564,286 @@ const SettingsPage = () => {
                 <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-tertiary)' }}>새로운 맵 파일을 업로드합니다</div>
               </div>
               
-              <div style={{ display: 'flex', gap: 'var(--space-md)', alignItems: 'center' }}>
-                <label style={{
+              {/* 추출된 맵 이름 표시 */}
+              {localSettings.extractedMapName && (
+                <div style={{ marginBottom: 'var(--space-md)' }}>
+                  <label style={{ 
+                    display: 'block', 
+                    marginBottom: 'var(--space-xs)',
+                    fontSize: 'var(--font-size-sm)',
+                    color: 'var(--text-secondary)'
+                  }}>
+                    맵 이름 (자동 추출됨)
+                  </label>
+                  <div style={{
+                    width: '100%',
                   padding: 'var(--space-sm) var(--space-md)',
+                    border: '1px solid var(--border-primary)',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: 'var(--bg-tertiary)',
+                    color: 'var(--text-primary)',
+                    fontSize: 'var(--font-size-sm)',
+                    fontFamily: 'inherit',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-sm)'
+                  }}>
+                    <i className="fas fa-tag" style={{ color: 'var(--primary-color)' }}></i>
+                    {localSettings.extractedMapName}
+                  </div>
+                </div>
+              )}
+              
+              {/* 파일 업로드 섹션 */}
+              <div style={{ display: 'grid', gap: 'var(--space-md)' }}>
+                {/* 이미지 파일 업로드 */}
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 'var(--space-md)',
+                  padding: 'var(--space-md)',
                   backgroundColor: 'var(--bg-secondary)',
-                  border: '2px dashed var(--border-primary)',
                   borderRadius: 'var(--radius-md)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-sm)',
-                  fontSize: 'var(--font-size-sm)',
-                  color: 'var(--text-secondary)',
-                  transition: 'all 0.2s ease',
-                  minWidth: '200px'
+                  border: '1px solid var(--border-primary)'
                 }}>
-                  <i className="fas fa-upload"></i>
-                  파일 선택
-                  <input
-                    type="file"
-                    accept=".png,.jpg,.jpeg,.svg,.pdf"
-                    onChange={handleFileUpload}
-                    style={{ display: 'none' }}
-                  />
-                </label>
-                
-                {localSettings.mapFileName && (
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 'var(--space-sm)',
+                  <div style={{ minWidth: '80px' }}>
+                    <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '500', color: 'var(--text-primary)' }}>
+                      이미지 파일
+                    </div>
+                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>
+                      .jpg, .png, .pgm
+                    </div>
+                  </div>
+                  
+                  <label style={{
                     padding: 'var(--space-sm) var(--space-md)',
                     backgroundColor: 'var(--bg-tertiary)',
-                    borderRadius: 'var(--radius-md)',
-                    flex: 1
+                    border: '1px solid var(--border-primary)',
+                    borderRadius: 'var(--radius-sm)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-sm)',
+                  fontSize: 'var(--font-size-sm)',
+                    color: 'var(--text-secondary)',
+                    transition: 'all 0.2s ease'
                   }}>
-                    <i className="fas fa-file" style={{ color: 'var(--primary-color)' }}></i>
-                    <span style={{ fontSize: 'var(--font-size-sm)', flex: 1 }}>
-                      {localSettings.mapFileName}
-                    </span>
-                    <button
-                      onClick={removeMapFile}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--text-tertiary)',
-                        cursor: 'pointer',
-                        padding: 'var(--space-xs)',
-                        fontSize: 'var(--font-size-sm)'
-                      }}
-                    >
-                      <i className="fas fa-times"></i>
-                    </button>
+                    <i className="fas fa-image"></i>
+                    {localSettings.imageFile ? '파일 변경' : '파일 선택'}
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.pgm"
+                      onChange={(e) => handleFileUpload('imageFile', e)}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                  
+                  {localSettings.imageFile && (
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 'var(--space-sm)',
+                      padding: 'var(--space-sm) var(--space-md)',
+                      backgroundColor: 'var(--bg-tertiary)',
+                      borderRadius: 'var(--radius-md)',
+                      flex: 1
+                    }}>
+                      <i className="fas fa-file-image" style={{ color: 'var(--primary-color)' }}></i>
+                      <span style={{ fontSize: 'var(--font-size-sm)', flex: 1 }}>
+                        {localSettings.imageFile.name}
+                      </span>
+                      <button
+                        onClick={() => removeMapFile('imageFile')}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-tertiary)',
+                          cursor: 'pointer',
+                          padding: 'var(--space-xs)',
+                          fontSize: 'var(--font-size-sm)'
+                        }}
+                      >
+                        <i className="fas fa-times"></i>
+                      </button>
+                    </div>
+                  )}
+            </div>
+
+                {/* 메타데이터 파일 업로드 */}
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 'var(--space-md)',
+                  padding: 'var(--space-md)',
+                  backgroundColor: 'var(--bg-secondary)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-primary)'
+                }}>
+                  <div style={{ minWidth: '80px' }}>
+                    <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '500', color: 'var(--text-primary)' }}>
+                      메타데이터
+            </div>
+                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>
+                      .yaml, .yml
+          </div>
+                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--primary-color)', fontWeight: '500' }}>
+                      맵 이름 자동 추출
+            </div>
+          </div>
+
+                  <label style={{
+                    padding: 'var(--space-sm) var(--space-md)',
+                    backgroundColor: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-primary)',
+                    borderRadius: 'var(--radius-sm)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-sm)',
+                    fontSize: 'var(--font-size-sm)',
+                    color: 'var(--text-secondary)',
+                    transition: 'all 0.2s ease'
+                  }}>
+                    <i className="fas fa-file-code"></i>
+                    {localSettings.metadataFile ? '파일 변경' : '파일 선택'}
+                <input
+                      type="file"
+                      accept=".yaml,.yml"
+                      onChange={(e) => handleFileUpload('metadataFile', e)}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                  
+                  {localSettings.metadataFile && (
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 'var(--space-sm)',
+                      padding: 'var(--space-sm) var(--space-md)',
+                      backgroundColor: 'var(--bg-tertiary)',
+                      borderRadius: 'var(--radius-md)',
+                      flex: 1
+                    }}>
+                      <i className="fas fa-file-code" style={{ color: 'var(--primary-color)' }}></i>
+                      <span style={{ fontSize: 'var(--font-size-sm)', flex: 1 }}>
+                        {localSettings.metadataFile.name}
+                      </span>
+                      <button
+                        onClick={() => removeMapFile('metadataFile')}
+                  style={{ 
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-tertiary)',
+                          cursor: 'pointer',
+                          padding: 'var(--space-xs)',
+                          fontSize: 'var(--font-size-sm)'
+                  }}
+                      >
+                        <i className="fas fa-times"></i>
+                      </button>
+                    </div>
+                  )}
+            </div>
+
+                {/* 노드 파일 업로드 */}
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 'var(--space-md)',
+                  padding: 'var(--space-md)',
+                  backgroundColor: 'var(--bg-secondary)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-primary)'
+                }}>
+                  <div style={{ minWidth: '80px' }}>
+                    <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '500', color: 'var(--text-primary)' }}>
+                      노드 파일
+            </div>
+                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>
+                      .yaml, .yml
+          </div>
+        </div>
+
+                  <label style={{
+                    padding: 'var(--space-sm) var(--space-md)',
+                    backgroundColor: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-primary)',
+                    borderRadius: 'var(--radius-sm)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-sm)',
+                    fontSize: 'var(--font-size-sm)',
+                    color: 'var(--text-secondary)',
+                    transition: 'all 0.2s ease'
+                  }}>
+                    <i className="fas fa-project-diagram"></i>
+                    {localSettings.nodesFile ? '파일 변경' : '파일 선택'}
+                    <input
+                      type="file"
+                      accept=".yaml,.yml"
+                      onChange={(e) => handleFileUpload('nodesFile', e)}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                  
+                  {localSettings.nodesFile && (
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 'var(--space-sm)',
+                      padding: 'var(--space-sm) var(--space-md)',
+                      backgroundColor: 'var(--bg-tertiary)',
+                      borderRadius: 'var(--radius-md)',
+                      flex: 1
+                    }}>
+                      <i className="fas fa-project-diagram" style={{ color: 'var(--primary-color)' }}></i>
+                      <span style={{ fontSize: 'var(--font-size-sm)', flex: 1 }}>
+                        {localSettings.nodesFile.name}
+                      </span>
+                      <button
+                        onClick={() => removeMapFile('nodesFile')}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-tertiary)',
+                          cursor: 'pointer',
+                          padding: 'var(--space-xs)',
+                          fontSize: 'var(--font-size-sm)'
+                        }}
+                      >
+                        <i className="fas fa-times"></i>
+                      </button>
+            </div>
+                  )}
+          </div>
+              </div>
+              
+              {/* 업로드 버튼 */}
+              <div style={{ marginTop: 'var(--space-md)' }}>
+                <button
+                  onClick={handleMapUpload}
+                  className="control-btn primary"
+                  disabled={!localSettings.extractedMapName && !localSettings.metadataFile}
+                  style={{ 
+                    width: '100%',
+                    padding: 'var(--space-md)',
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: '500',
+                    opacity: (!localSettings.extractedMapName && !localSettings.metadataFile) ? 0.5 : 1
+                  }}
+                >
+                  <i className="fas fa-upload"></i>
+                  맵 업로드
+                </button>
+                {!localSettings.extractedMapName && !localSettings.metadataFile && (
+                  <div style={{ 
+                    marginTop: 'var(--space-xs)',
+                    fontSize: 'var(--font-size-xs)',
+                    color: 'var(--text-tertiary)',
+                    textAlign: 'center'
+                  }}>
+                    메타데이터 파일을 업로드하면 맵 이름이 자동으로 추출됩니다
                   </div>
                 )}
               </div>
@@ -457,7 +893,7 @@ const SettingsPage = () => {
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
                             <div
-                              style={{
+                  style={{ 
                                 width: '12px',
                                 height: '12px',
                                 borderRadius: '50%',
@@ -524,7 +960,7 @@ const SettingsPage = () => {
                                   fontSize: 'var(--font-size-xs)'
                                 }}>
                                   {map.isActive ? '활성' : '비활성'}
-                                </span>
+                </span>
                               </div>
                             ))}
                           </div>
