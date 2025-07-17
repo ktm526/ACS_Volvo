@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { AppProvider, useAppContext } from './contexts/AppContext.jsx';
 import Header from './components/layout/Header';
 import MainPage from './pages/MainPage';
@@ -9,6 +9,11 @@ import './App.css';
 
 const AppContent = () => {
   const { state } = useAppContext();
+
+  // 테마가 변경될 때마다 body에 클래스 적용
+  useEffect(() => {
+    document.body.className = state.ui.theme;
+  }, [state.ui.theme]);
 
   const renderCurrentPage = () => {
     switch (state.currentPage) {
@@ -26,7 +31,7 @@ const AppContent = () => {
   };
 
   return (
-    <div className="app">
+    <div className={`app ${state.ui.theme}`}>
       {/* 헤더 (네비게이션 포함) */}
       <Header />
       

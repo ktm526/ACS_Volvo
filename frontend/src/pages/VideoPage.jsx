@@ -116,284 +116,136 @@ const VideoPage = () => {
       overflow: 'auto'
     }}>
       {/* 필터 및 컨트롤 섹션 */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 'var(--space-xl)',
-        padding: 'var(--space-lg)',
-        backgroundColor: 'var(--bg-secondary)',
-        borderRadius: 'var(--radius-lg)',
-        border: '1px solid var(--border-color)'
-      }}>
-        {/* 로봇 선택 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
-          <label style={{ 
-            fontSize: 'var(--font-md)', 
-            fontWeight: '600',
-            minWidth: '60px'
-          }}>
-            로봇:
-          </label>
-          <select
-            value={selectedRobot}
-            onChange={(e) => setSelectedRobot(e.target.value)}
-            style={{
-              padding: 'var(--space-sm) var(--space-md)',
-              fontSize: 'var(--font-sm)',
-              backgroundColor: 'var(--bg-primary)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border-color)',
-              borderRadius: 'var(--radius-md)',
-              outline: 'none',
-              minWidth: '120px'
-            }}
-          >
-            {Array.isArray(robots) && robots.map(robot => (
-              <option key={robot.id} value={robot.id}>
-                {robot.name || robot.id}
-              </option>
-            ))}
-          </select>
-          
-          {/* 선택된 로봇 상태 표시 */}
-          {selectedRobot && Array.isArray(robots) && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
-              <div style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: getStatusColor(robots.find(r => r.id === selectedRobot)?.status)
-              }} />
-              <span style={{ fontSize: 'var(--font-sm)', color: 'var(--text-secondary)' }}>
-                {robots.find(r => r.id === selectedRobot)?.status || 'unknown'}
-              </span>
-            </div>
-          )}
+      <div className="card" style={{ marginBottom: 'var(--space-xl)' }}>
+        <div className="card-header">
+          <div className="card-title">
+            <i className="fas fa-video"></i>
+            영상 모니터링
+          </div>
         </div>
-
-        {/* 뷰 선택 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
-          <label style={{ 
-            fontSize: 'var(--font-md)', 
-            fontWeight: '600',
-            minWidth: '80px'
+        <div className="card-content">
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 'var(--space-lg)'
           }}>
-            카메라 뷰:
-          </label>
-          <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
-            {viewOptions.map(view => (
-              <button
-                key={view.id}
-                onClick={() => setSelectedView(view.id)}
-                style={{
-                  padding: 'var(--space-sm)',
-                  fontSize: 'var(--font-sm)',
-                  backgroundColor: selectedView === view.id ? 'var(--primary-color)' : 'var(--bg-primary)',
-                  color: selectedView === view.id ? 'white' : 'var(--text-primary)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: 'var(--radius-md)',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  minWidth: '60px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '2px'
-                }}
-                title={view.label}
-              >
-                <i className={view.icon}></i>
-                <span style={{ fontSize: '10px' }}>{view.label}</span>
-              </button>
-            ))}
+            {/* 로봇 선택 */}
+            <div className="card-row" style={{ borderBottom: 'none' }}>
+              <div className="card-value" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', borderBottom: 'none' }}>
+                <select
+                  value={selectedRobot}
+                  onChange={(e) => setSelectedRobot(e.target.value)}
+                  className="control-btn"
+                  style={{
+                    padding: 'var(--space-sm) var(--space-md)',
+                    fontSize: 'var(--font-size-sm)',
+                    minWidth: '120px',
+                    border: 'none'
+                  }}
+                >
+                  {Array.isArray(robots) && robots.map(robot => (
+                    <option key={robot.id} value={robot.id}>
+                      {robot.name || robot.id}
+                    </option>
+                  ))}
+                </select>
+                
+                {/* 선택된 로봇 상태 표시 */}
+                {selectedRobot && Array.isArray(robots) && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)'}}>
+                    <div style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      backgroundColor: getStatusColor(robots.find(r => r.id === selectedRobot)?.status)
+                    }} />
+                    
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 뷰 선택 */}
+            <div className="card-row">
+              <div className="card-value">
+                <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
+                  {viewOptions.map(view => (
+                    <button
+                      key={view.id}
+                      onClick={() => setSelectedView(view.id)}
+                      className={`control-btn ${selectedView === view.id ? 'primary' : ''}`}
+                      style={{
+                        padding: 'var(--space-sm)',
+                        fontSize: 'var(--font-size-sm)',
+                        minWidth: '60px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '2px'
+                      }}
+                      title={view.label}
+                    >
+                      <i className={view.icon}></i>
+                      <span style={{ fontSize: '10px' }}>{view.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* 영상 표시 영역 */}
-      <div style={{
-        backgroundColor: 'var(--bg-secondary)',
-        borderRadius: 'var(--radius-lg)',
-        border: '1px solid var(--border-color)',
-        padding: 'var(--space-lg)',
-        minHeight: '600px'
-      }}>
-        {selectedView === 'all' ? (
-          // 전체 뷰 - 2x2 그리드
-          <div>
-            <h3 style={{
-              margin: '0 0 var(--space-lg) 0',
-              fontSize: 'var(--font-lg)',
-              fontWeight: '600',
-              textAlign: 'center'
-            }}>
-              {Array.isArray(robots) ? (robots.find(r => r.id === selectedRobot)?.name || selectedRobot) : selectedRobot} - 전방향 카메라
-            </h3>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gridTemplateRows: '1fr 1fr',
-              gap: 'var(--space-md)',
-              height: '540px'
-            }}>
-              {cameras.map(camera => (
-                <div key={camera.id} style={{
-                  backgroundColor: 'var(--bg-primary)',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border-color)',
-                  overflow: 'hidden',
-                  position: 'relative',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  {/* 카메라 라벨 */}
-                  <div style={{
-                    position: 'absolute',
-                    top: 'var(--space-sm)',
-                    left: 'var(--space-sm)',
-                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                    color: 'white',
-                    padding: 'var(--space-xs) var(--space-sm)',
-                    borderRadius: 'var(--radius-sm)',
-                    fontSize: 'var(--font-sm)',
-                    fontWeight: '600',
-                    zIndex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--space-xs)'
-                  }}>
-                    <i className={camera.icon}></i>
-                    {camera.label}
-                  </div>
-                  
-                  {/* 영상 없음 텍스트 */}
-                  <div style={{
-                    textAlign: 'center',
-                    color: 'var(--text-secondary)',
-                    fontSize: 'var(--font-md)'
-                  }}>
-                    <i className="fas fa-video-slash" style={{ 
-                      fontSize: '2rem', 
-                      marginBottom: 'var(--space-sm)',
-                      opacity: 0.5
-                    }}></i>
-                    <div>영상이 없습니다</div>
-                  </div>
-                </div>
-              ))}
+      <div className="card">
+        <div className="card-header">
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            width: '100%'
+          }}>
+            {/* 좌측 제목 */}
+            <div className="card-title" style={{ flex: '0 0 auto' }}>
+              <i className="fas fa-camera"></i>
+              {Array.isArray(robots) ? (robots.find(r => r.id === selectedRobot)?.name || selectedRobot) : selectedRobot} - 
+              {selectedView === 'all' ? ' 전방향 카메라' : ` ${viewOptions.find(v => v.id === selectedView)?.label} 카메라`}
             </div>
-          </div>
-        ) : (
-          // 단일 뷰
-          <div>
-            <h3 style={{
-              margin: '0 0 var(--space-lg) 0',
-              fontSize: 'var(--font-lg)',
-              fontWeight: '600',
-              textAlign: 'center',
+            
+            {/* 우측 카메라 상태 정보 */}
+            <div style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              gap: 'var(--space-sm)'
+              gap: 'var(--space-lg)',
+              fontSize: 'var(--font-size-sm)',
+              color: 'var(--text-secondary)',
+              flex: '0 0 auto'
             }}>
-              <i className={cameras.find(c => c.id === selectedView)?.icon}></i>
-              {Array.isArray(robots) ? (robots.find(r => r.id === selectedRobot)?.name || selectedRobot) : selectedRobot} - {cameras.find(c => c.id === selectedView)?.label} 카메라
-            </h3>
-            <div style={{
-              backgroundColor: 'var(--bg-primary)',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border-color)',
-              overflow: 'hidden',
-              height: '540px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              {/* 영상 없음 텍스트 */}
-              <div style={{
-                textAlign: 'center',
-                color: 'var(--text-secondary)',
-                fontSize: 'var(--font-lg)'
-              }}>
-                <i className="fas fa-video-slash" style={{ 
-                  fontSize: '3rem', 
-                  marginBottom: 'var(--space-md)',
-                  opacity: 0.5
-                }}></i>
-                <div>영상이 없습니다</div>
-                <div style={{ 
-                  fontSize: 'var(--font-sm)', 
-                  marginTop: 'var(--space-sm)',
-                  opacity: 0.7 
-                }}>
-                  {cameras.find(c => c.id === selectedView)?.label} 카메라
-                </div>
-              </div>
+              <div>활성 카메라: {selectedView === 'all' ? '4개 (전체)' : `1개 (${viewOptions.find(v => v.id === selectedView)?.label})`}</div>
+              <div>녹화 상태: 비활성</div>
             </div>
           </div>
-        )}
-      </div>
-
-      {/* 추가 정보 표시 */}
-      <div style={{
-        marginTop: 'var(--space-lg)',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-        gap: 'var(--space-md)'
-      }}>
-        {/* 연결 상태 */}
-        <div style={{
-          backgroundColor: 'var(--bg-secondary)',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--border-color)',
-          padding: 'var(--space-md)'
-        }}>
-          <h4 style={{ margin: '0 0 var(--space-sm) 0', fontSize: 'var(--font-md)', fontWeight: '600' }}>
-            <i className="fas fa-wifi" style={{ marginRight: 'var(--space-xs)', color: '#EF4444' }}></i>
-            연결 상태
-          </h4>
-          <div style={{ fontSize: 'var(--font-sm)', color: 'var(--text-secondary)' }}>
-            <div>영상 품질: 연결 안됨</div>
-            <div>프레임율: 0 FPS</div>
-            <div>지연 시간: -</div>
-          </div>
         </div>
-
-        {/* 로봇 정보 */}
-        <div style={{
-          backgroundColor: 'var(--bg-secondary)',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--border-color)',
-          padding: 'var(--space-md)'
-        }}>
-          <h4 style={{ margin: '0 0 var(--space-sm) 0', fontSize: 'var(--font-md)', fontWeight: '600' }}>
-            <i className="fas fa-robot" style={{ marginRight: 'var(--space-xs)', color: 'var(--primary-color)' }}></i>
-            로봇 정보
-          </h4>
-          <div style={{ fontSize: 'var(--font-sm)', color: 'var(--text-secondary)' }}>
-            <div>ID: {selectedRobot}</div>
-            <div>상태: {Array.isArray(robots) ? (robots.find(r => r.id === selectedRobot)?.status || 'unknown') : 'unknown'}</div>
-            <div>배터리: 85%</div>
-          </div>
-        </div>
-
-        {/* 카메라 정보 */}
-        <div style={{
-          backgroundColor: 'var(--bg-secondary)',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--border-color)',
-          padding: 'var(--space-md)'
-        }}>
-          <h4 style={{ margin: '0 0 var(--space-sm) 0', fontSize: 'var(--font-md)', fontWeight: '600' }}>
-            <i className="fas fa-video" style={{ marginRight: 'var(--space-xs)', color: '#F59E0B' }}></i>
-            카메라 정보
-          </h4>
-          <div style={{ fontSize: 'var(--font-sm)', color: 'var(--text-secondary)' }}>
-            <div>활성 카메라: {selectedView === 'all' ? '4개 (전체)' : `1개 (${viewOptions.find(v => v.id === selectedView)?.label})`}</div>
-            <div>녹화 상태: 비활성</div>
-            <div>야간 모드: 자동</div>
+        <div className="card-content">
+          {/* 단일 영상 뷰어 */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '540px',
+            color: 'var(--text-tertiary)',
+            fontSize: 'var(--font-size-lg)',
+            flexDirection: 'column',
+            gap: 'var(--space-md)'
+          }}>
+            <i className="fas fa-video" style={{ fontSize: '4rem', opacity: 0.3 }}></i>
+            <div style={{ fontSize: 'var(--font-size-lg)' }}>
+              {selectedView === 'all' ? '전방향' : viewOptions.find(v => v.id === selectedView)?.label} 카메라
+            </div>
+            <div style={{ fontSize: 'var(--font-size-sm)', opacity: 0.7 }}>
+              카메라 연결 대기중
+            </div>
           </div>
         </div>
       </div>

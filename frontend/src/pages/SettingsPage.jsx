@@ -11,14 +11,16 @@ const SettingsPage = () => {
     imageFile: null,
     metadataFile: null,
     nodesFile: null,
-    selectedRobotMaps: {} // 로봇별 맵 목록 저장
+    selectedRobotMaps: {}, // 로봇별 맵 목록 저장
+    expandedRobots: {} // 로봇별 확장 상태 저장
   });
 
   const [serverMaps, setServerMaps] = useState([]);
   const [robots, setRobots] = useState([]);
   const [loading, setLoading] = useState({
     maps: false,
-    robots: false
+    robots: false,
+    robotMaps: {} // 로봇별 맵 로딩 상태
   });
 
   // API URL 설정
@@ -149,6 +151,34 @@ const SettingsPage = () => {
   useEffect(() => {
     fetchServerMaps();
     loadRobots();
+    
+    // 애니메이션 CSS 추가
+    const styleId = 'robot-maps-animations';
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.innerHTML = `
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+    
+    // 컴포넌트 언마운트 시 스타일 제거
+    return () => {
+      const styleToRemove = document.getElementById(styleId);
+      if (styleToRemove) {
+        styleToRemove.remove();
+      }
+    };
   }, []);
 
   const handleSettingChange = (setting, value) => {
@@ -346,40 +376,210 @@ const SettingsPage = () => {
     }
   };
 
-  const handleViewRobotMaps = async (robotId) => {
-    try {
-      // 실제 API 호출로 해당 로봇의 맵 목록을 가져올 것
-      const response = await fetch(`${API_URL}/api/robots/${robotId}/maps`);
-      let robotMaps;
-      
-      if (response.ok) {
-        robotMaps = await response.json();
-      } else {
-        // API 실패 시 임시 데이터 사용
-        robotMaps = [
-          { id: 'map001', name: '1층 작업공간', isActive: true },
-          { id: 'map002', name: '2층 작업공간', isActive: false }
-        ];
+  const handleToggleRobotMaps = async (robotId) => {
+    const isCurrentlyExpanded = localSettings.expandedRobots[robotId];
+    
+    // 토글 상태 업데이트
+    setLocalSettings(prev => ({
+      ...prev,
+      expandedRobots: {
+        ...prev.expandedRobots,
+        [robotId]: !isCurrentlyExpanded
       }
-      
-      setLocalSettings(prev => ({
+    }));
+    
+    // 확장하는 경우에만 맵 목록 가져오기
+    if (!isCurrentlyExpanded) {
+      // 로딩 상태 시작
+      setLoading(prev => ({
         ...prev,
-        selectedRobotMaps: {
-          ...prev.selectedRobotMaps,
-          [robotId]: robotMaps
+        robotMaps: {
+          ...prev.robotMaps,
+          [robotId]: true
         }
       }));
+      
+      try {
+        // 실제 API 호출로 해당 로봇의 맵 목록을 가져올 것
+        const response = await fetch(`${API_URL}/api/robots/${robotId}/maps`);
+        let robotMaps;
+        
+        if (response.ok) {
+          robotMaps = await response.json();
+        } else {
+          // API 실패 시 임시 데이터 사용
+          robotMaps = [
+            { id: 'map001', name: '1층 작업공간', isActive: true },
+            { id: 'map002', name: '2층 작업공간', isActive: false }
+          ];
+        }
+        
+        setLocalSettings(prev => ({
+          ...prev,
+          selectedRobotMaps: {
+            ...prev.selectedRobotMaps,
+            [robotId]: robotMaps
+          }
+        }));
 
-      const robot = robots.find(r => r.id === robotId);
-      actions.addNotification({
-        type: 'info',
-        message: `${robot?.name || '로봇'}의 맵 목록을 조회했습니다.`
+        const robot = robots.find(r => r.id === robotId);
+        actions.addNotification({
+          type: 'info',
+          message: `${robot?.name || '로봇'}의 맵 목록을 조회했습니다.`
+        });
+      } catch (error) {
+        console.error('로봇 맵 목록 가져오기 실패:', error);
+        actions.addNotification({
+          type: 'error',
+          message: '로봇 맵 목록을 가져오는데 실패했습니다.'
+        });
+        
+        // 오류 발생 시 확장 상태 되돌리기
+        setLocalSettings(prev => ({
+          ...prev,
+          expandedRobots: {
+            ...prev.expandedRobots,
+            [robotId]: false
+          }
+        }));
+      } finally {
+        // 로딩 상태 종료
+        setLoading(prev => ({
+          ...prev,
+          robotMaps: {
+            ...prev.robotMaps,
+            [robotId]: false
+          }
+        }));
+      }
+    }
+  };
+
+  // 개별 로봇 맵 업로드 핸들러
+  const handleRobotMapUpload = (robotId) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.jpg,.jpeg,.png,.pgm,.yaml,.yml';
+    input.multiple = true;
+    input.onchange = async (e) => {
+      const files = Array.from(e.target.files);
+      if (files.length > 0) {
+        await uploadMapToRobot(robotId, files);
+      }
+    };
+    input.click();
+  };
+
+  // 전체 로봇 맵 업로드 핸들러
+  const handleBulkRobotMapUpload = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.jpg,.jpeg,.png,.pgm,.yaml,.yml';
+    input.multiple = true;
+    input.onchange = async (e) => {
+      const files = Array.from(e.target.files);
+      if (files.length > 0) {
+        await uploadMapToBulk(files);
+      }
+    };
+    input.click();
+  };
+
+  // 개별 로봇 맵 업로드 함수
+  const uploadMapToRobot = async (robotId, files) => {
+    try {
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append('files', file);
       });
+      
+      const response = await fetch(`${API_URL}/api/robots/${robotId}/map-upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (response.ok) {
+        actions.addNotification({
+          type: 'success',
+          message: `로봇 ${robotId}에 맵이 성공적으로 업로드되었습니다.`
+        });
+      } else {
+        actions.addNotification({
+          type: 'error',
+          message: '맵 업로드에 실패했습니다.'
+        });
+      }
     } catch (error) {
-      console.error('로봇 맵 목록 가져오기 실패:', error);
       actions.addNotification({
         type: 'error',
-        message: '로봇 맵 목록을 가져오는데 실패했습니다.'
+        message: '맵 업로드 중 오류가 발생했습니다.'
+      });
+    }
+  };
+
+  // 전체 로봇 맵 업로드 함수
+  const uploadMapToBulk = async (files) => {
+    try {
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append('files', file);
+      });
+      
+      const response = await fetch(`${API_URL}/api/robots/bulk-map-upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (response.ok) {
+        actions.addNotification({
+          type: 'success',
+          message: '모든 로봇에 맵이 성공적으로 업로드되었습니다.'
+        });
+      } else {
+        actions.addNotification({
+          type: 'error',
+          message: '맵 업로드에 실패했습니다.'
+        });
+      }
+    } catch (error) {
+      actions.addNotification({
+        type: 'error',
+        message: '맵 업로드 중 오류가 발생했습니다.'
+      });
+    }
+  };
+
+  // 로봇 맵 다운로드 함수
+  const handleRobotMapDownload = async (robotId, mapId, mapName) => {
+    try {
+      const response = await fetch(`${API_URL}/api/robots/${robotId}/maps/${mapId}/download`);
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${mapName}_${robotId}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        actions.addNotification({
+          type: 'success',
+          message: `${mapName} 맵이 성공적으로 다운로드되었습니다.`
+        });
+      } else {
+        actions.addNotification({
+          type: 'error',
+          message: '맵 다운로드에 실패했습니다.'
+        });
+      }
+    } catch (error) {
+      console.error('맵 다운로드 에러:', error);
+      actions.addNotification({
+        type: 'error',
+        message: '맵 다운로드 중 오류가 발생했습니다.'
       });
     }
   };
@@ -398,7 +598,8 @@ const SettingsPage = () => {
       imageFile: null,
       metadataFile: null,
       nodesFile: null,
-      selectedRobotMaps: {}
+      selectedRobotMaps: {},
+      expandedRobots: {}
     };
     setLocalSettings(defaultSettings);
   };
@@ -851,9 +1052,33 @@ const SettingsPage = () => {
 
             {/* 로봇 리스트 */}
             <div className="card-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
-              <div style={{ marginBottom: 'var(--space-md)' }}>
-                <div className="card-label" style={{ fontSize: 'var(--font-size-base)', color: 'var(--text-primary)', marginBottom: 'var(--space-xs)' }}>서버 로봇 목록</div>
-                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-tertiary)' }}>서버에 등록된 로봇 목록입니다</div>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                marginBottom: 'var(--space-md)' 
+              }}>
+                <div>
+                  <div className="card-label" style={{ fontSize: 'var(--font-size-base)', color: 'var(--text-primary)', marginBottom: 'var(--space-xs)' }}>서버 로봇 목록</div>
+                  <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-tertiary)' }}>서버에 등록된 로봇 목록입니다</div>
+                </div>
+                {robots && robots.length > 0 && (
+                  <button
+                    onClick={handleBulkRobotMapUpload}
+                    className="control-btn primary"
+                    style={{
+                      fontSize: 'var(--font-size-sm)',
+                      padding: 'var(--space-xs) var(--space-sm)',
+                      minWidth: 'auto',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--space-xs)'
+                    }}
+                  >
+                    <i className="fas fa-upload"></i>
+                    전체 맵 업로드
+                  </button>
+                )}
               </div>
 
               <div style={{
@@ -879,21 +1104,24 @@ const SettingsPage = () => {
                 ) : robots && robots.length > 0 ? (
                   <div style={{ display: 'grid', gap: 'var(--space-sm)' }}>
                     {robots.map((robot) => (
-                      <div key={robot.id}>
+                      <div key={robot.id} style={{
+                        backgroundColor: 'var(--bg-tertiary)',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1px solid var(--border-secondary)',
+                        overflow: 'hidden',
+                        transition: 'all 0.3s ease-out'
+                      }}>
                         <div
                           style={{
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            padding: 'var(--space-sm) var(--space-md)',
-                            backgroundColor: 'var(--bg-tertiary)',
-                            borderRadius: 'var(--radius-sm)',
-                            border: '1px solid var(--border-secondary)'
+                            padding: 'var(--space-sm) var(--space-md)'
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
                             <div
-                  style={{ 
+                              style={{ 
                                 width: '12px',
                                 height: '12px',
                                 borderRadius: '50%',
@@ -915,56 +1143,132 @@ const SettingsPage = () => {
                               {robot.type}
                             </span>
                           </div>
-                          <button
-                            onClick={() => handleViewRobotMaps(robot.id)}
-                            className="control-btn"
-                            style={{ 
-                              fontSize: 'var(--font-size-xs)', 
-                              padding: 'var(--space-xs) var(--space-sm)',
-                              minWidth: 'unset'
-                            }}
-                          >
-                            <i className="fas fa-map"></i>
-                            맵 목록
-                          </button>
+                          <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
+                            <button
+                              onClick={() => handleRobotMapUpload(robot.id)}
+                              className="control-btn"
+                              style={{ 
+                                fontSize: 'var(--font-size-xs)', 
+                                padding: 'var(--space-xs) var(--space-sm)',
+                                minWidth: 'unset'
+                              }}
+                            >
+                              <i className="fas fa-upload"></i>
+                              맵 업로드
+                            </button>
+                            <button
+                              onClick={() => handleToggleRobotMaps(robot.id)}
+                              className="control-btn"
+                              style={{ 
+                                fontSize: 'var(--font-size-xs)', 
+                                padding: 'var(--space-xs)',
+                                minWidth: 'unset',
+                                transition: 'all 0.3s ease',
+                                transform: localSettings.expandedRobots[robot.id] ? 'rotate(180deg)' : 'rotate(0deg)'
+                              }}
+                            >
+                              <i className="fas fa-chevron-down"></i>
+                            </button>
+                          </div>
                         </div>
                         
-                        {/* 로봇의 맵 목록 (조회 시 표시) */}
-                        {localSettings.selectedRobotMaps[robot.id] && (
-                          <div style={{
-                            marginTop: 'var(--space-sm)',
-                            padding: 'var(--space-sm)',
-                            backgroundColor: 'var(--bg-quaternary)',
-                            borderRadius: 'var(--radius-sm)',
-                            border: '1px solid var(--border-tertiary)'
-                          }}>
-                            <div style={{ 
-                              fontSize: 'var(--font-size-xs)', 
-                              color: 'var(--text-tertiary)', 
-                              marginBottom: 'var(--space-xs)',
-                              fontWeight: '500'
+                        {/* 로봇의 맵 목록 (확장 시 표시) */}
+                        <div style={{
+                          overflow: 'hidden',
+                          transition: 'max-height 0.3s ease-out',
+                          maxHeight: localSettings.expandedRobots[robot.id] ? '500px' : '0px'
+                        }}>
+                          {localSettings.expandedRobots[robot.id] && (
+                            <div style={{
+                              padding: 'var(--space-sm) var(--space-md)',
+                              borderTop: '1px solid var(--border-tertiary)'
                             }}>
-                              {robot.name}의 맵 목록:
-                            </div>
-                            {localSettings.selectedRobotMaps[robot.id].map((map) => (
-                              <div key={map.id} style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                padding: 'var(--space-xs)',
-                                fontSize: 'var(--font-size-xs)'
+                              <div style={{ 
+                                fontSize: 'var(--font-size-xs)', 
+                                color: 'var(--text-tertiary)', 
+                                marginBottom: 'var(--space-sm)',
+                                fontWeight: '500'
                               }}>
-                                <span>{map.name}</span>
-                                <span style={{ 
-                                  color: map.isActive ? 'var(--success-color)' : 'var(--text-tertiary)',
+                                {robot.name}의 맵 목록:
+                              </div>
+                              {loading.robotMaps[robot.id] ? (
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  padding: 'var(--space-md)',
+                                  color: 'var(--text-tertiary)',
                                   fontSize: 'var(--font-size-xs)'
                                 }}>
-                                  {map.isActive ? '활성' : '비활성'}
-                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                                  <i className="fas fa-spinner fa-spin" style={{ marginRight: 'var(--space-xs)' }}></i>
+                                  맵 목록을 불러오는 중...
+                                </div>
+                              ) : localSettings.selectedRobotMaps[robot.id] ? (
+                                localSettings.selectedRobotMaps[robot.id].map((map, index) => (
+                                  <div key={map.id} style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: 'var(--space-xs) 0',
+                                    fontSize: 'var(--font-size-xs)',
+                                    borderBottom: index < localSettings.selectedRobotMaps[robot.id].length - 1 ? '1px solid var(--border-tertiary)' : 'none',
+                                    opacity: 0,
+                                    animation: 'fadeInUp 0.3s ease-out forwards',
+                                    animationDelay: `${0.1 * (index + 1)}s`
+                                  }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
+                                      <span>{map.name}</span>
+                                      <span style={{ 
+                                        color: map.isActive ? 'var(--success-color)' : 'var(--text-tertiary)',
+                                        fontSize: 'var(--font-size-xs)'
+                                      }}>
+                                        {map.isActive ? '활성' : '비활성'}
+                                      </span>
+                                    </div>
+                                    <button
+                                      onClick={() => handleRobotMapDownload(robot.id, map.id, map.name)}
+                                      className="control-btn"
+                                      style={{
+                                        fontSize: 'var(--font-size-xs)',
+                                        padding: '2px 6px',
+                                        minWidth: 'auto',
+                                        backgroundColor: 'transparent',
+                                        border: '1px solid var(--border-primary)',
+                                        color: 'var(--text-secondary)',
+                                        transition: 'all 0.2s ease'
+                                      }}
+                                      onMouseOver={(e) => {
+                                        e.target.style.backgroundColor = 'var(--primary-color)';
+                                        e.target.style.color = 'white';
+                                        e.target.style.borderColor = 'var(--primary-color)';
+                                      }}
+                                      onMouseOut={(e) => {
+                                        e.target.style.backgroundColor = 'transparent';
+                                        e.target.style.color = 'var(--text-secondary)';
+                                        e.target.style.borderColor = 'var(--border-primary)';
+                                      }}
+                                      title={`${map.name} 맵 다운로드`}
+                                    >
+                                      <i className="fas fa-download"></i>
+                                    </button>
+                                  </div>
+                                ))
+                              ) : (
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  padding: 'var(--space-md)',
+                                  color: 'var(--text-tertiary)',
+                                  fontSize: 'var(--font-size-xs)'
+                                }}>
+                                  <i className="fas fa-exclamation-triangle" style={{ marginRight: 'var(--space-xs)' }}></i>
+                                  맵 목록을 불러올 수 없습니다
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

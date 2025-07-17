@@ -9,27 +9,27 @@
 }
 
 :root {
-  /* Tesla Cybertruck inspired color palette */
+  /* Tesla Cybertruck inspired color palette - Dark Mode */
   --primary-color: #00d4ff;
   --primary-glow: #00d4ff;
   --secondary-color: #0a0a0a;
   --accent-color: #00e6ff;
   --accent-secondary: #00b8d4;
   
-  /* Background hierarchy */
+  /* Background hierarchy - Dark Mode */
   --bg-primary: #000000;
   --bg-secondary: #0a0a0a;
   --bg-tertiary: #111111;
   --bg-card: #0f0f0f;
   --bg-overlay: rgba(0, 0, 0, 0.95);
   
-  /* Text colors */
+  /* Text colors - Dark Mode */
   --text-primary: #ffffff;
   --text-secondary: rgba(255, 255, 255, 0.8);
   --text-tertiary: rgba(255, 255, 255, 0.6);
   --text-quaternary: rgba(255, 255, 255, 0.4);
   
-  /* Borders and dividers */
+  /* Borders and dividers - Dark Mode */
   --border-primary: rgba(255, 255, 255, 0.12);
   --border-secondary: rgba(255, 255, 255, 0.08);
   --border-accent: rgba(0, 212, 255, 0.3);
@@ -83,6 +83,48 @@
   --z-fixed: 1020;
   --z-modal: 1030;
   --z-tooltip: 1040;
+}
+
+/* Light Mode Variables */
+.app.light {
+  /* Primary colors remain the same for consistency */
+  --primary-color: #0088cc;
+  --primary-glow: #0088cc;
+  --secondary-color: #f5f5f5;
+  --accent-color: #0099dd;
+  --accent-secondary: #0077bb;
+  
+  /* Background hierarchy - Light Mode */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #f0f1f2;
+  --bg-card: #ffffff;
+  --bg-overlay: rgba(255, 255, 255, 0.95);
+  
+  /* Text colors - Light Mode */
+  --text-primary: #1a1a1a;
+  --text-secondary: rgba(26, 26, 26, 0.8);
+  --text-tertiary: rgba(26, 26, 26, 0.6);
+  --text-quaternary: rgba(26, 26, 26, 0.4);
+  
+  /* Borders and dividers - Light Mode */
+  --border-primary: rgba(0, 0, 0, 0.12);
+  --border-secondary: rgba(0, 0, 0, 0.08);
+  --border-accent: rgba(0, 136, 204, 0.3);
+  
+  /* Status colors - adjusted for light mode */
+  --status-success: #28a745;
+  --status-warning: #ffc107;
+  --status-error: #dc3545;
+  --status-info: #17a2b8;
+  --status-idle: #6c757d;
+  
+  /* Effects - Light Mode */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.2);
+  --shadow-glow: 0 0 20px rgba(0, 136, 204, 0.15);
+  --shadow-glow-strong: 0 0 30px rgba(0, 136, 204, 0.25);
 }
 
 body {

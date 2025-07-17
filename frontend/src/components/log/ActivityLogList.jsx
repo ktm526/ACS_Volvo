@@ -8,6 +8,32 @@ const ActivityLogList = ({
   getLevelIcon,
   formatDuration
 }) => {
+  // CSV 다운로드 기능
+  const handleCsvDownload = () => {
+    const csvHeaders = ['시간', '레벨', '로봇', '카테고리', '메시지', '세부정보'];
+    const csvData = filteredLogs.map(log => [
+      log.timestamp.toLocaleString('ko-KR'),
+      log.level,
+      log.robotName || '',
+      log.category || '',
+      log.message || '',
+      log.details || ''
+    ]);
+    
+    const csvContent = [csvHeaders, ...csvData]
+      .map(row => row.map(cell => `"${cell}"`).join(','))
+      .join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `activity_logs_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
   return (
     <div className="card">
       <div className="card-header">
@@ -15,6 +41,21 @@ const ActivityLogList = ({
           <i className="fas fa-list-alt"></i>
           활동 로그 ({filteredLogs.length})
         </div>
+        <button
+          onClick={handleCsvDownload}
+          className="control-btn"
+          style={{ 
+            fontSize: 'var(--font-size-sm)',
+            padding: 'var(--space-xs) var(--space-sm)',
+            minWidth: 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-xs)'
+          }}
+        >
+          <i className="fas fa-download"></i>
+          CSV 다운로드
+        </button>
       </div>
       <div className="card-content">
         <div style={{

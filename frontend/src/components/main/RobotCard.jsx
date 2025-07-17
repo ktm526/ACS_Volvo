@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { getRobotStatusIcon, getRobotStatusColor } from '../../utils/mainPageUtils';
 import { getStatusColor } from '../../constants';
 
-const RobotCard = ({ robot, isSelected, onSelect, isMobile = false }) => {
+const RobotCard = ({ robot, isSelected, onSelect, onDoubleClick, isMobile = false }) => {
   const isActiveSelection = isSelected === robot.id;
   const [isHovered, setIsHovered] = useState(false);
   
@@ -67,7 +67,12 @@ const RobotCard = ({ robot, isSelected, onSelect, isMobile = false }) => {
   
   return (
     <div
-      onClick={() => onSelect(robot.id)}
+      onClick={() => {
+        onSelect(robot.id);
+        if (onDoubleClick) {
+          onDoubleClick(robot);
+        }
+      }}
       style={getCardStyle()}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}

@@ -3,17 +3,28 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Html, Line } from '@react-three/drei';
 import { createPortal } from 'react-dom';
 import { STATIONS, PATHS } from '../../constants';
+import { useAppContext } from '../../contexts/AppContext';
 import * as THREE from 'three';
 import MapRenderer3D from './MapRenderer3D';
 
 // 카메라 애니메이션 컴포넌트
-function CameraController({ viewMode, zoomLevel, trackedRobot, duration = 1.0 }) {
+function CameraController({ viewMode, zoomLevel, trackedRobot, duration = 1.0, initialCameraState = null }) {
   const { camera, controls } = useThree();
   const animationRef = useRef(null);
   const lastConfig = useRef({ viewMode: null, zoomLevel: null, trackedRobot: null });
+  const initialStateApplied = useRef(false);
 
   useEffect(() => {
     if (!controls) return;
+
+    // 초기 카메라 상태가 있고 아직 적용되지 않았다면 건너뛰기
+    if (initialCameraState && !initialStateApplied.current) {
+      // 초기 상태가 적용될 때까지 기다리기
+      const timer = setTimeout(() => {
+        initialStateApplied.current = true;
+      }, 100);
+      return () => clearTimeout(timer);
+    }
 
     // 설정이 변경되었는지 확인
     const configChanged = 
@@ -135,34 +146,99 @@ function CameraController({ viewMode, zoomLevel, trackedRobot, duration = 1.0 })
   return null;
 }
 
-// 사이드바와 통일된 색상 팔레트
-const METRO_COLORS = {
-  // 주요 노선 색상
-  line1: '#FF0040',      // 빨간선 (네온 레드)
-  line2: '#00FF88',      // 초록선 (네온 그린)
-  line3: '#0080FF',      // 파란선 (네온 블루)
-  line4: '#FF8000',      // 주황선 (네온 오렌지)
-  line5: '#8000FF',      // 보라선 (네온 퍼플)
+// 카메라 상태 추적 및 저장 컴포넌트
+function CameraStateTracker({ initialCameraState, onCameraStateChange }) {
+  const { camera, controls } = useThree();
+  const lastSaveTime = useRef(Date.now());
+  const saveThreshold = 500; // 500ms 후에 저장
+
+  // 초기 카메라 상태 복원
+  useEffect(() => {
+    if (initialCameraState && initialCameraState.position && initialCameraState.target && controls) {
+      const { position, target } = initialCameraState;
+      
+      // 카메라 위치 복원
+      camera.position.set(position.x, position.y, position.z);
+      
+      // 컨트롤 타겟 복원
+      controls.target.set(target.x, target.y, target.z);
+      
+      // 컨트롤 업데이트
+      controls.update();
+      
+      console.log('Camera state restored:', { position, target });
+    }
+  }, [initialCameraState, camera, controls]);
+
+  // 카메라 상태 변경 감지
+  useFrame(() => {
+    if (!controls || !onCameraStateChange) return;
+
+    const now = Date.now();
+    if (now - lastSaveTime.current > saveThreshold) {
+      const currentState = {
+        position: {
+          x: camera.position.x,
+          y: camera.position.y,
+          z: camera.position.z
+        },
+        target: {
+          x: controls.target.x,
+          y: controls.target.y,
+          z: controls.target.z
+        },
+        rotation: {
+          x: camera.rotation.x,
+          y: camera.rotation.y,
+          z: camera.rotation.z
+        }
+      };
+
+      onCameraStateChange(currentState);
+      lastSaveTime.current = now;
+    }
+  });
+
+  return null;
+}
+
+// 테마에 따른 색상 팔레트 함수
+const getMetroColors = (theme) => {
+  const isDark = theme === 'dark';
   
-  // 로봇 상태 색상 (사이드바와 통일)
-  moving: '#3B82F6',     // 이동중 (파란색)
-  idle: '#22C55E',       // 대기 (녹색)
-  charging: '#F59E0B',   // 충전중 (주황색)
-  error: '#EF4444',      // 오류 (빨간색)
-  working: '#F59E0B',    // 작업중 (주황색)
-  
-  // 스테이션 타입 색상
-  station: '#40FF80',    // 일반 스테이션
-  charging_station: '#FF8040', // 충전소
-  depot: '#8040FF',      // 창고
-  
-  // 환경 색상
-  background: '#0A0A0F', // 배경
-  grid: '#404060',       // 그리드 (더 밝게)
-  glow: '#00FFFF',       // 글로우 효과
-  text: '#FFFFFF',       // 텍스트
-  path: '#40A0FF',       // 연결 경로 (밝은 파란색)
-  robot: '#CCCCCC'       // 로봇 통일 색상 (밝은 회색)
+  return {
+    // 주요 노선 색상 (테마 공통)
+    line1: '#FF0040',      // 빨간선 (네온 레드)
+    line2: '#00FF88',      // 초록선 (네온 그린)
+    line3: '#0080FF',      // 파란선 (네온 블루)
+    line4: '#FF8000',      // 주황선 (네온 오렌지)
+    line5: '#8000FF',      // 보라선 (네온 퍼플)
+    
+    // 로봇 상태 색상 (사이드바와 통일)
+    moving: '#3B82F6',     // 이동중 (파란색)
+    idle: '#22C55E',       // 대기 (녹색)
+    charging: '#F59E0B',   // 충전중 (주황색)
+    error: '#EF4444',      // 오류 (빨간색)
+    working: '#F59E0B',    // 작업중 (주황색)
+    
+    // 스테이션 타입 색상
+    station: isDark ? '#40FF80' : '#2ECC71',    // 일반 스테이션
+    charging_station: isDark ? '#FF8040' : '#E67E22', // 충전소
+    depot: isDark ? '#8040FF' : '#9B59B6',      // 창고
+    
+    // 환경 색상 (테마별 차별화)
+    background: isDark ? '#0A0A0F' : '#F8F9FA', // 배경
+    grid: isDark ? '#404060' : '#BDC3C7',       // 그리드
+    glow: isDark ? '#00FFFF' : '#3498DB',       // 글로우 효과
+    text: isDark ? '#FFFFFF' : '#2C3E50',       // 텍스트
+    path: isDark ? '#40A0FF' : '#3498DB',       // 연결 경로
+    robot: isDark ? '#CCCCCC' : '#7F8C8D',      // 로봇 색상
+    
+    // 툴팁 추가 색상
+    textSecondary: isDark ? '#CCCCCC' : '#6C757D',      // 보조 텍스트
+    border: isDark ? '#333333' : '#E0E0E0',             // 테두리
+    backgroundSecondary: isDark ? '#333333' : '#F5F5F5' // 보조 배경
+  };
 };
 
 // 확장된 스테이션 데이터 (지하철 노선도 스타일)
@@ -195,12 +271,12 @@ const METRO_STATIONS = [
   { id: 'D04', name: '예비창고', x: 10, y: -10, type: 'depot', line: 'line4' }
 ];
 
-// 노선 경로 데이터
-const METRO_LINES = [
+// 노선 경로 데이터 함수
+const getMetroLines = (colors) => [
   {
     id: 'line1',
     name: '메인라인 1호선',
-    color: METRO_COLORS.line1,
+    color: colors.line1,
     points: [
       [-20, 0], [-15, 0], [-10, 0], [0, 0], [10, 0], [15, 0], [20, 0]
     ]
@@ -208,7 +284,7 @@ const METRO_LINES = [
   {
     id: 'line2',
     name: '메인라인 2호선',
-    color: METRO_COLORS.line2,
+    color: colors.line2,
     points: [
       [0, -15], [0, -10], [0, 0], [0, 10], [0, 15]
     ]
@@ -216,7 +292,7 @@ const METRO_LINES = [
   {
     id: 'line3',
     name: '지선 3호선',
-    color: METRO_COLORS.line3,
+    color: colors.line3,
     points: [
       [-10, -10], [-5, -5], [0, 0], [5, 5], [10, 10]
     ]
@@ -224,44 +300,44 @@ const METRO_LINES = [
   {
     id: 'line4',
     name: '지선 4호선',
-    color: METRO_COLORS.line4,
+    color: colors.line4,
     points: [
       [-10, 10], [-5, 5], [0, 0], [5, -5], [10, -10]
     ]
   }
 ];
 
-// 연결 경로 데이터 (스테이션 간 추가 연결)
-const CONNECTION_PATHS = [
+// 연결 경로 데이터 함수 (스테이션 간 추가 연결)
+const getConnectionPaths = (colors) => [
   // 1호선과 2호선 연결부 강화
-  { points: [[-15, 0], [0, -10]], color: METRO_COLORS.path },
-  { points: [[-10, 0], [0, -10]], color: METRO_COLORS.path },
-  { points: [[10, 0], [0, 10]], color: METRO_COLORS.path },
-  { points: [[15, 0], [0, 10]], color: METRO_COLORS.path },
+  { points: [[-15, 0], [0, -10]], color: colors.path },
+  { points: [[-10, 0], [0, -10]], color: colors.path },
+  { points: [[10, 0], [0, 10]], color: colors.path },
+  { points: [[15, 0], [0, 10]], color: colors.path },
   
   // 대각선 연결
-  { points: [[-15, 0], [-10, -10]], color: METRO_COLORS.path },
-  { points: [[-10, 0], [-5, -5]], color: METRO_COLORS.path },
-  { points: [[10, 0], [5, 5]], color: METRO_COLORS.path },
-  { points: [[15, 0], [10, 10]], color: METRO_COLORS.path },
+  { points: [[-15, 0], [-10, -10]], color: colors.path },
+  { points: [[-10, 0], [-5, -5]], color: colors.path },
+  { points: [[10, 0], [5, 5]], color: colors.path },
+  { points: [[15, 0], [10, 10]], color: colors.path },
   
   // 반대 대각선 연결
-  { points: [[-15, 0], [-10, 10]], color: METRO_COLORS.path },
-  { points: [[-10, 0], [-5, 5]], color: METRO_COLORS.path },
-  { points: [[10, 0], [5, -5]], color: METRO_COLORS.path },
-  { points: [[15, 0], [10, -10]], color: METRO_COLORS.path },
+  { points: [[-15, 0], [-10, 10]], color: colors.path },
+  { points: [[-10, 0], [-5, 5]], color: colors.path },
+  { points: [[10, 0], [5, -5]], color: colors.path },
+  { points: [[15, 0], [10, -10]], color: colors.path },
   
   // 수직선과 대각선 연결
-  { points: [[0, -10], [-5, -5]], color: METRO_COLORS.path },
-  { points: [[0, -10], [5, -5]], color: METRO_COLORS.path },
-  { points: [[0, 10], [-5, 5]], color: METRO_COLORS.path },
-  { points: [[0, 10], [5, 5]], color: METRO_COLORS.path },
+  { points: [[0, -10], [-5, -5]], color: colors.path },
+  { points: [[0, -10], [5, -5]], color: colors.path },
+  { points: [[0, 10], [-5, 5]], color: colors.path },
+  { points: [[0, 10], [5, 5]], color: colors.path },
   
   // 창고와 충전소 연결
-  { points: [[-20, 0], [0, -15]], color: METRO_COLORS.path },
-  { points: [[20, 0], [0, 15]], color: METRO_COLORS.path },
-  { points: [[-10, -10], [10, -10]], color: METRO_COLORS.path },
-  { points: [[-10, 10], [10, 10]], color: METRO_COLORS.path }
+  { points: [[-20, 0], [0, -15]], color: colors.path },
+  { points: [[20, 0], [0, 15]], color: colors.path },
+  { points: [[-10, -10], [10, -10]], color: colors.path },
+  { points: [[-10, 10], [10, 10]], color: colors.path }
 ];
 
 // 노선 렌더링 컴포넌트
@@ -319,12 +395,12 @@ function MetroLine({ line, isActive = false }) {
 }
 
 // 스테이션 컴포넌트 (원형 테 제거)
-function MetroStation({ station, isSelected = false }) {
+function MetroStation({ station, colors, isSelected = false }) {
   const [isHovered, setIsHovered] = useState(false);
   
-  const stationColor = station.type === 'charging_station' ? METRO_COLORS.charging_station :
-                      station.type === 'depot' ? METRO_COLORS.depot :
-                      METRO_COLORS.station;
+  const stationColor = station.type === 'charging_station' ? colors.charging_station :
+                      station.type === 'depot' ? colors.depot :
+                      colors.station;
   
   return (
     <group position={[station.x, 0, station.y]}>
@@ -349,7 +425,7 @@ function MetroStation({ station, isSelected = false }) {
           <div style={{
             background: `linear-gradient(45deg, ${stationColor}80, ${stationColor}40)`,
             border: `2px solid ${stationColor}`,
-            color: METRO_COLORS.text,
+            color: colors.text,
             padding: '8px 12px',
             borderRadius: '12px',
             fontSize: '10px',
@@ -359,8 +435,8 @@ function MetroStation({ station, isSelected = false }) {
             backdropFilter: 'blur(10px)',
             boxShadow: `0 0 20px ${stationColor}40`
           }}>
-            <div>{station.name}</div>
-            <div style={{ fontSize: '8px', opacity: 0.8 }}>{station.id}</div>
+            <div style={{ color: colors.text }}>{station.name}</div>
+            <div style={{ fontSize: '8px', opacity: 0.8, color: colors.textSecondary || '#cccccc' }}>{station.id}</div>
           </div>
         </Html>
       )}
@@ -369,7 +445,7 @@ function MetroStation({ station, isSelected = false }) {
 }
 
 // 로봇 컴포넌트
-function MetroRobot({ robot, isSelected = false, onHover, onHoverEnd }) {
+function MetroRobot({ robot, colors, isSelected = false, onHover, onHoverEnd }) {
   const meshRef = useRef();
   const pulseRef = useRef();
   const pulseRef2 = useRef();
@@ -379,12 +455,12 @@ function MetroRobot({ robot, isSelected = false, onHover, onHoverEnd }) {
   // 사이드바와 동일한 상태 색상 매핑
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
-      case 'moving': return METRO_COLORS.moving;
-      case 'charging': return METRO_COLORS.charging;
-      case 'error': return METRO_COLORS.error;
-      case 'working': return METRO_COLORS.working;
+      case 'moving': return colors.moving;
+      case 'charging': return colors.charging;
+      case 'error': return colors.error;
+      case 'working': return colors.working;
       case 'idle':
-      default: return METRO_COLORS.idle;
+      default: return colors.idle;
     }
   };
   
@@ -652,41 +728,73 @@ function ConnectionPath({ path }) {
 }
 
 // 단순한 그리드
-function MetroGrid() {
+function MetroGrid({ colors }) {
   return (
     <group>
       {/* 메인 바닥 - 맵 크기에 맞게 확대 */}
       <mesh position={[0, -0.1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[800, 800]} />
-        <meshBasicMaterial color={METRO_COLORS.background} />
+        <meshBasicMaterial color={colors.background} />
       </mesh>
       
       {/* 더 촘촘한 그리드 라인 (10배 더 세밀) */}
-      <gridHelper args={[800, 400, METRO_COLORS.grid, METRO_COLORS.grid]} opacity={0.6} />
+      <gridHelper args={[800, 400, colors.grid, colors.grid]} opacity={0.6} />
       
       {/* 보조 미세 그리드 (더 촘촘한 격자) */}
-      <gridHelper args={[800, 1600, '#2a2a3a', '#2a2a3a']} opacity={0.3} />
+      <gridHelper args={[800, 1600, colors.grid, colors.grid]} opacity={0.3} />
     </group>
   );
 }
 
 // 개선된 고정 크기 툴팁 컴포넌트
-function FixedTooltip({ robot, position, visible }) {
+function FixedTooltip({ robot, colors, position, visible, theme }) {
   if (!visible || !position || !robot) return null;
 
   // 사이드바와 동일한 상태 색상 매핑
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
-      case 'moving': return METRO_COLORS.moving;
-      case 'charging': return METRO_COLORS.charging;
-      case 'error': return METRO_COLORS.error;
-      case 'working': return METRO_COLORS.working;
+      case 'moving': return colors.moving;
+      case 'charging': return colors.charging;
+      case 'error': return colors.error;
+      case 'working': return colors.working;
       case 'idle':
-      default: return METRO_COLORS.idle;
+      default: return colors.idle;
     }
   };
 
   const statusColor = getStatusColor(robot.status);
+
+  // 테마별 색상 정의
+  const getThemeColors = (theme) => {
+    if (theme === 'light') {
+      return {
+        background: '#ffffff',
+        textPrimary: '#2c3e50',
+        textSecondary: '#34495e',
+        textTertiary: '#7f8c8d',
+        border: '#e0e0e0',
+        batteryBg: '#f5f5f5',
+        batteryBorder: '#d0d0d0',
+        shadowColor: 'rgba(0,0,0,0.1)',
+        tailBackground: '#ffffff'
+      };
+    } else {
+      // 기본값은 다크 테마 (theme === 'dark' 또는 정의되지 않음)
+      return {
+        background: '#1a1a1a',
+        textPrimary: '#ffffff',
+        textSecondary: '#e5e5e5',
+        textTertiary: '#cccccc',
+        border: '#333333',
+        batteryBg: '#333333',
+        batteryBorder: '#555555',
+        shadowColor: 'rgba(0,0,0,0.3)',
+        tailBackground: '#1a1a1a'
+      };
+    }
+  };
+
+  const themeColors = getThemeColors(theme || 'dark');
 
   const safeBattery = robot.battery || 0;
   const safeName = robot.name || robot.id || 'Unknown';
@@ -722,17 +830,17 @@ function FixedTooltip({ robot, position, visible }) {
     }}>
       {/* 메인 툴팁 박스 */}
       <div style={{
-        background: '#1a1a1a',
+        background: themeColors.background,
         border: `2px solid ${statusColor}`,
         borderRadius: '16px',
-        color: '#ffffff',
+        color: themeColors.textPrimary,
         padding: '20px 24px 24px 24px',
         fontSize: '16px',
         fontWeight: 'bold',
         textAlign: 'left',
         width: '320px',
         backdropFilter: 'blur(10px)',
-        boxShadow: `0 0 20px ${statusColor}40, 0 4px 12px rgba(0,0,0,0.3)`,
+        boxShadow: `0 0 20px ${statusColor}40, 0 4px 12px ${themeColors.shadowColor}`,
         position: 'relative'
       }}>
         {/* 아래쪽 중앙 테두리 제거용 박스 */}
@@ -743,7 +851,7 @@ function FixedTooltip({ robot, position, visible }) {
           transform: 'translateX(-50%)',
           width: '34px',
           height: '4px',
-          background: '#1a1a1a'
+          background: themeColors.tailBackground
         }}></div>
 
         {/* 로봇 헤더 */}
@@ -753,7 +861,7 @@ function FixedTooltip({ robot, position, visible }) {
           gap: '12px',
           marginBottom: '12px',
           paddingBottom: '12px',
-          borderBottom: `1px solid #333333`
+          borderBottom: `1px solid ${themeColors.border}`
         }}>
           <div style={{
             width: '24px',
@@ -771,10 +879,10 @@ function FixedTooltip({ robot, position, visible }) {
              robot.status === 'error' ? '✕' : '⏸'}
           </div>
           <div>
-            <div style={{ fontSize: '18px', fontWeight: '700', color: '#ffffff' }}>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: themeColors.textPrimary }}>
               {safeName}
             </div>
-            <div style={{ fontSize: '13px', color: '#cccccc' }}>
+            <div style={{ fontSize: '13px', color: themeColors.textTertiary }}>
               {safeId}
             </div>
           </div>
@@ -783,10 +891,10 @@ function FixedTooltip({ robot, position, visible }) {
             <div style={{
               width: '28px',
               height: '12px',
-              backgroundColor: '#333333',
+              backgroundColor: themeColors.batteryBg,
               borderRadius: '3px',
               position: 'relative',
-              border: '1px solid #555555'
+              border: `1px solid ${themeColors.batteryBorder}`
             }}>
               <div style={{
                 width: `${safeBattery}%`,
@@ -796,7 +904,7 @@ function FixedTooltip({ robot, position, visible }) {
                 borderRadius: '2px'
               }}></div>
             </div>
-            <span style={{ fontSize: '13px', fontWeight: '600', color: '#ffffff' }}>
+            <span style={{ fontSize: '13px', fontWeight: '600', color: themeColors.textPrimary }}>
               {safeBattery}%
             </span>
           </div>
@@ -806,13 +914,13 @@ function FixedTooltip({ robot, position, visible }) {
         <div style={{
           fontSize: '14px',
           marginBottom: '10px',
-          color: '#e5e5e5'
+          color: themeColors.textSecondary
         }}>
           {safeMission}
         </div>
 
         {/* 상세 정보 */}
-        <div style={{ fontSize: '13px', color: '#cccccc' }}>
+        <div style={{ fontSize: '13px', color: themeColors.textTertiary }}>
           <div style={{ marginBottom: '6px' }}>
             위치: ({safeLocationX}, {safeLocationY})
           </div>
@@ -842,7 +950,7 @@ function FixedTooltip({ robot, position, visible }) {
         borderLeft: '16px solid transparent',
         borderRight: '16px solid transparent',
         borderTop: `20px solid ${statusColor}`,
-        filter: `drop-shadow(0 2px 4px rgba(0,0,0,0.3))`
+        filter: `drop-shadow(0 2px 4px ${themeColors.shadowColor})`
       }}></div>
       
       {/* 내부 배경 삼각형 */}
@@ -855,7 +963,7 @@ function FixedTooltip({ robot, position, visible }) {
         height: '0',
         borderLeft: '13px solid transparent',
         borderRight: '13px solid transparent',
-        borderTop: '17px solid #1a1a1a'
+        borderTop: `17px solid ${themeColors.background}`
       }}></div>
     </div>,
     document.body
@@ -875,10 +983,18 @@ const Scene3D = ({
   zoomLevel = 1,
   trackedRobot = null,
   mapData = null,
-  showMapData = false
+  showMapData = false,
+  initialCameraState = null,
+  onCameraStateChange = null
 }) => {
+  const { state } = useAppContext();
   const [activeLines, setActiveLines] = useState(['line1', 'line2']);
   const [tooltipData, setTooltipData] = useState({ robot: null, position: null, visible: false });
+  
+  // 테마에 따른 색상 팔레트 가져오기
+  const colors = getMetroColors(state.ui.theme);
+  const metroLines = getMetroLines(colors);
+  const connectionPaths = getConnectionPaths(colors);
   
   // 서버에서 받은 실제 로봇 데이터 사용
   const activeRobots = robots || [];
@@ -932,17 +1048,17 @@ const Scene3D = ({
         style={{ 
           width: '100%', 
           height: '100%',
-          background: `radial-gradient(circle at center, ${METRO_COLORS.background} 0%, #000000 100%)`
+          background: `radial-gradient(circle at center, ${colors.background} 0%, ${colors.background === '#F8F9FA' ? '#E9ECEF' : '#000000'} 100%)`
         }}
       >
         {/* 조명 설정 */}
-        <ambientLight intensity={0.4} color={METRO_COLORS.glow} />
-        <pointLight position={[0, 30, 0]} intensity={0.6} color={METRO_COLORS.glow} />
-        <pointLight position={[20, 20, 20]} intensity={0.3} color={METRO_COLORS.line1} />
-        <pointLight position={[-20, 20, -20]} intensity={0.3} color={METRO_COLORS.line2} />
+        <ambientLight intensity={0.4} color={colors.glow} />
+        <pointLight position={[0, 30, 0]} intensity={0.6} color={colors.glow} />
+        <pointLight position={[20, 20, 20]} intensity={0.3} color={colors.line1} />
+        <pointLight position={[-20, 20, -20]} intensity={0.3} color={colors.line2} />
 
         {/* 배경 그리드 */}
-        {showGrid && <MetroGrid />}
+        {showGrid && <MetroGrid colors={colors} />}
 
         {/* 맵 데이터가 있을 때는 실제 맵 렌더링, 없을 때는 기본 지하철 노선도 */}
         {showMapData && mapData ? (
@@ -958,7 +1074,7 @@ const Scene3D = ({
         ) : (
           <>
             {/* 지하철 노선들 */}
-            {showPaths && METRO_LINES.map(line => (
+            {showPaths && metroLines.map(line => (
               <MetroLine 
                 key={line.id} 
                 line={line} 
@@ -967,7 +1083,7 @@ const Scene3D = ({
             ))}
 
             {/* 연결 경로 */}
-            {showPaths && CONNECTION_PATHS.map((path, index) => (
+            {showPaths && connectionPaths.map((path, index) => (
               <ConnectionPath 
                 key={`connection-${index}`}
                 path={path}
@@ -979,6 +1095,7 @@ const Scene3D = ({
               <MetroStation 
                 key={station.id} 
                 station={station}
+                colors={colors}
                 isSelected={false}
               />
             ))}
@@ -990,6 +1107,7 @@ const Scene3D = ({
           <MetroRobot 
             key={robot.id} 
             robot={robot}
+            colors={colors}
             isSelected={trackedRobot ? (selectedRobot === robot.id) : false}
             onHover={handleRobotHover}
             onHoverEnd={handleRobotHoverEnd}
@@ -1002,7 +1120,7 @@ const Scene3D = ({
             <PathTrail 
               key={`trail-${robot.id}`}
               path={robot.path}
-              color={robot.status === 'moving' ? METRO_COLORS.active : METRO_COLORS.idle}
+              color={robot.status === 'moving' ? colors.moving : colors.idle}
             />
           )
         ))}
@@ -1013,6 +1131,7 @@ const Scene3D = ({
           zoomLevel={zoomLevel}
           trackedRobot={trackedRobotData}
           duration={1.0}
+          initialCameraState={initialCameraState}
         />
         
         <OrbitControls 
@@ -1031,13 +1150,21 @@ const Scene3D = ({
           screenSpacePanning={false}
           makeDefault={true}
         />
+        
+        {/* 카메라 상태 추적 및 저장 */}
+        <CameraStateTracker 
+          initialCameraState={initialCameraState}
+          onCameraStateChange={onCameraStateChange}
+        />
       </Canvas>
 
       {/* 개선된 툴팁 */}
       <FixedTooltip 
         robot={tooltipData.robot}
+        colors={colors}
         position={tooltipData.position}
         visible={tooltipData.visible}
+        theme={state.ui?.theme || 'dark'}
       />
     </>
   );

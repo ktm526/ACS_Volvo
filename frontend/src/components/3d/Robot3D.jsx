@@ -1,7 +1,8 @@
-import React, { useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
 import { Html, Sphere, Cylinder } from '@react-three/drei';
 import * as THREE from 'three';
+import { useAppContext } from '../../contexts/AppContext';
 
 const Robot3D = ({ 
   robot, 
@@ -11,11 +12,15 @@ const Robot3D = ({
   brandColors,
   isSelected = false 
 }) => {
+  const { theme } = useAppContext();
   const meshRef = useRef();
   const glowRef = useRef();
   const indicatorRef = useRef();
   const trailRef = useRef();
   const shieldRef = useRef();
+  const { camera, gl } = useThree();
+  const [screenPosition, setScreenPosition] = useState({ x: 0, y: 0 });
+  const [isVisible, setIsVisible] = useState(true);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -257,7 +262,9 @@ const Robot3D = ({
         >
           <div
             style={{
-              background: `linear-gradient(135deg, ${getStatusColor(robot.status)}22, ${getStatusColor(robot.status)}44)`,
+              background: theme === 'dark' 
+                ? `linear-gradient(135deg, ${getStatusColor(robot.status)}22, ${getStatusColor(robot.status)}44)` 
+                : `linear-gradient(135deg, ${getStatusColor(robot.status)}15, ${getStatusColor(robot.status)}30)`,
               border: `1px solid ${getStatusColor(robot.status)}`,
               borderRadius: '8px',
               padding: '4px 8px',
@@ -266,15 +273,19 @@ const Robot3D = ({
               fontFamily: 'SF Pro Display, -apple-system, sans-serif',
               fontWeight: '600',
               textAlign: 'center',
-              textShadow: `0 0 8px ${getStatusColor(robot.status)}`,
+              textShadow: theme === 'dark' 
+                ? `0 0 8px ${getStatusColor(robot.status)}` 
+                : `0 0 4px ${getStatusColor(robot.status)}`,
               backdropFilter: 'blur(10px)',
-              boxShadow: `0 0 20px ${getStatusColor(robot.status)}33`,
+              boxShadow: theme === 'dark' 
+                ? `0 0 20px ${getStatusColor(robot.status)}33` 
+                : `0 0 15px ${getStatusColor(robot.status)}20`,
               opacity: hoveredRobot?.id === robot.id || isSelected ? 1 : 0.8,
               transform: `scale(${isSelected ? 1.1 : 1})`,
               transition: 'all 0.3s ease'
             }}
           >
-            <div>{robot.id}</div>
+            <div style={{ color: theme === 'dark' ? '#ffffff' : '#2c3e50' }}>{robot.id}</div>
             <div style={{ 
               fontSize: '10px', 
               opacity: 0.8, 

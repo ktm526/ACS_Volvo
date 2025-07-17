@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useAppContext } from '../../contexts/AppContext';
 
 const MapControls = ({ 
   robots = [], 
@@ -14,6 +15,7 @@ const MapControls = ({
   onMapSelect,
   mapLoading = false
 }) => {
+  const { state } = useAppContext();
   const [isExpanded, setIsExpanded] = useState(false);
   const [showRobotList, setShowRobotList] = useState(false);
   const [showMapList, setShowMapList] = useState(false);
@@ -89,12 +91,12 @@ const MapControls = ({
     >
       {/* 메인 컨트롤 패널 */}
       <div style={{
-        background: 'rgba(0, 0, 0, 0.85)',
+        background: 'var(--bg-overlay)',
         backdropFilter: 'blur(10px)',
         border: '1px solid var(--border-primary)',
         borderRadius: '12px',
         padding: 'var(--space-sm)',
-        boxShadow: '0 8px 32px rgba(0, 212, 255, 0.1)',
+        boxShadow: 'var(--shadow-glow)',
         transition: 'all 0.3s ease'
       }}>
         {/* 헤더 */}
@@ -221,12 +223,12 @@ const MapControls = ({
                   top: '100%',
                   left: '48px',
                   right: 0,
-                  background: 'rgba(0, 0, 0, 0.9)',
+                  background: 'var(--bg-overlay)',
                   backdropFilter: 'blur(10px)',
                   border: '1px solid var(--border-primary)',
                   borderRadius: '8px',
                   padding: 'var(--space-xs)',
-                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+                  boxShadow: 'var(--shadow-lg)',
                   zIndex: 1001,
                   marginTop: '4px',
                   maxHeight: '200px',
@@ -513,12 +515,12 @@ const MapControls = ({
       {/* 로봇 선택 드롭다운 */}
       {showRobotList && (
         <div style={{
-          background: 'rgba(0, 0, 0, 0.9)',
+          background: 'var(--bg-overlay)',
           backdropFilter: 'blur(15px)',
           border: '1px solid var(--border-primary)',
           borderRadius: '12px',
           padding: 'var(--space-sm)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+          boxShadow: 'var(--shadow-lg)',
           maxHeight: '200px',
           overflowY: 'auto',
           minWidth: '150px'

@@ -3,6 +3,7 @@ import Scene3D from '../components/3d/Scene3D';
 import Sidebar from '../components/main/Sidebar';
 import MainViewOverlay from '../components/main/MainViewOverlay';
 import MapControls from '../components/main/MapControls';
+import RobotDetailModal from '../components/main/RobotDetailModal';
 import { useAppContext } from '../contexts/AppContext.jsx';
 import { calculateStats } from '../utils/mainPageUtils';
 
@@ -18,13 +19,56 @@ const MainPage = () => {
   });
 
   const [selectedRobot, setSelectedRobot] = useState(null);
-  const [viewMode, setViewMode] = useState('overview');
   const [liveDataEnabled, setLiveDataEnabled] = useState(true);
   const [sidebarTab, setSidebarTab] = useState('robots');
   
+  // localStorage에서 카메라 상태 로드
+  const loadCameraState = () => {
+    try {
+      const savedCameraState = localStorage.getItem('cameraState');
+      if (savedCameraState) {
+        const parsed = JSON.parse(savedCameraState);
+        return {
+          viewMode: parsed.viewMode || 'overview',
+          zoomLevel: parsed.zoomLevel || 1,
+          trackedRobot: null, // 추적 로봇은 세션별로 초기화
+          cameraPosition: parsed.cameraPosition || null,
+          cameraTarget: parsed.cameraTarget || null,
+          cameraRotation: parsed.cameraRotation || null
+        };
+      }
+    } catch (error) {
+      console.error('Failed to load camera state from localStorage:', error);
+    }
+    return {
+      viewMode: 'overview',
+      zoomLevel: 1,
+      trackedRobot: null,
+      cameraPosition: null,
+      cameraTarget: null,
+      cameraRotation: null
+    };
+  };
+
+  // localStorage에 카메라 상태 저장
+  const saveCameraState = (cameraState) => {
+    try {
+      localStorage.setItem('cameraState', JSON.stringify(cameraState));
+    } catch (error) {
+      console.error('Failed to save camera state to localStorage:', error);
+    }
+  };
+
   // 지도 컨트롤 상태
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [trackedRobot, setTrackedRobot] = useState(null);
+  const initialCameraState = loadCameraState();
+  const [viewMode, setViewMode] = useState(initialCameraState.viewMode);
+  const [zoomLevel, setZoomLevel] = useState(initialCameraState.zoomLevel);
+  const [trackedRobot, setTrackedRobot] = useState(initialCameraState.trackedRobot);
+  const [cameraState, setCameraState] = useState({
+    position: initialCameraState.cameraPosition,
+    target: initialCameraState.cameraTarget,
+    rotation: initialCameraState.cameraRotation
+  });
   
   // 맵 관련 상태
   const [availableMaps, setAvailableMaps] = useState([]);
@@ -39,6 +83,21 @@ const MainPage = () => {
   // 반응형 상태
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  // 로봇 상세정보 모달 상태
+  const [showRobotDetail, setShowRobotDetail] = useState(false);
+  const [selectedRobotDetail, setSelectedRobotDetail] = useState(null);
+  
+  // 로봇 상세정보 모달 핸들러
+  const handleShowRobotDetail = (robot) => {
+    setSelectedRobotDetail(robot);
+    setShowRobotDetail(true);
+  };
+  
+  const handleCloseRobotDetail = () => {
+    setShowRobotDetail(false);
+    setSelectedRobotDetail(null);
+  };
 
   // 활성 데이터
   const activeRobots = robots || [];
@@ -187,15 +246,35 @@ const MainPage = () => {
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
-  // 지도 컨트롤 핸들러들
+  // 카메라 상태 변경 및 저장 핸들러
   const handleViewModeChange = (newViewMode) => {
     console.log('View mode change:', viewMode, '->', newViewMode);
     setViewMode(newViewMode);
+    
+    // 카메라 상태 저장
+    const newCameraState = {
+      viewMode: newViewMode,
+      zoomLevel,
+      cameraPosition: cameraState.position,
+      cameraTarget: cameraState.target,
+      cameraRotation: cameraState.rotation
+    };
+    saveCameraState(newCameraState);
   };
 
   const handleZoomChange = (newZoomLevel) => {
     console.log('Zoom change:', zoomLevel, '->', newZoomLevel);
     setZoomLevel(newZoomLevel);
+    
+    // 카메라 상태 저장
+    const newCameraState = {
+      viewMode,
+      zoomLevel: newZoomLevel,
+      cameraPosition: cameraState.position,
+      cameraTarget: cameraState.target,
+      cameraRotation: cameraState.rotation
+    };
+    saveCameraState(newCameraState);
   };
 
   const handleRobotTrack = (robotId) => {
@@ -204,6 +283,21 @@ const MainPage = () => {
     if (robotId) {
       setSelectedRobot(robotId);
     }
+  };
+
+  // 3D 씬에서 카메라 상태 변경을 받는 핸들러
+  const handleCameraStateChange = (newCameraState) => {
+    setCameraState(newCameraState);
+    
+    // 카메라 상태 저장
+    const stateTosave = {
+      viewMode,
+      zoomLevel,
+      cameraPosition: newCameraState.position,
+      cameraTarget: newCameraState.target,
+      cameraRotation: newCameraState.rotation
+    };
+    saveCameraState(stateTosave);
   };
 
   // 컴포넌트 마운트 시 최소 로딩 시간 타이머 시작
@@ -395,6 +489,7 @@ const MainPage = () => {
             missions={activeMissions}
             selectedRobot={selectedRobot}
             setSelectedRobot={setSelectedRobot}
+            onShowRobotDetail={handleShowRobotDetail}
             isLoading={isLoading}
             isMobile={isMobile}
             onClose={() => setSidebarOpen(false)}
@@ -550,6 +645,8 @@ const MainPage = () => {
                 trackedRobot={trackedRobot}
                 mapData={currentMapData}
                 showMapData={!!currentMapData}
+                initialCameraState={cameraState}
+                onCameraStateChange={handleCameraStateChange}
               />
               <MainViewOverlay stats={stats} />
               <MapControls
@@ -569,6 +666,13 @@ const MainPage = () => {
           )}
         </div>
       </div>
+      
+      {/* 로봇 상세정보 모달 */}
+      <RobotDetailModal
+        robot={selectedRobotDetail}
+        isOpen={showRobotDetail}
+        onClose={handleCloseRobotDetail}
+      />
     </div>
   );
 };

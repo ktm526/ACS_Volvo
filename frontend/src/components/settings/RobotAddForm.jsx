@@ -78,17 +78,23 @@ const RobotAddForm = ({ onSubmit, onCancel }) => {
             style={{
               width: '100%',
               padding: 'var(--space-sm)',
-              backgroundColor: 'var(--bg-primary)',
-              border: `1px solid ${errors.name ? '#ef4444' : 'var(--border-primary)'}`,
+              backgroundColor: 'var(--bg-secondary)',
+              border: `1px solid ${errors.name ? 'var(--status-error)' : 'var(--border-primary)'}`,
               borderRadius: 'var(--radius-sm)',
               color: 'var(--text-primary)',
               fontSize: 'var(--font-size-sm)',
               outline: 'none',
               transition: 'border-color 0.2s'
             }}
+            onFocus={(e) => {
+              e.target.style.borderColor = 'var(--primary-color)';
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = errors.name ? 'var(--status-error)' : 'var(--border-primary)';
+            }}
           />
           {errors.name && (
-            <span style={{ color: '#ef4444', fontSize: 'var(--font-size-xs)', marginTop: 'var(--space-xs)', display: 'block' }}>
+            <span style={{ color: 'var(--status-error)', fontSize: 'var(--font-size-xs)', marginTop: 'var(--space-xs)', display: 'block' }}>
               {errors.name}
             </span>
           )}
@@ -114,17 +120,23 @@ const RobotAddForm = ({ onSubmit, onCancel }) => {
             style={{
               width: '100%',
               padding: 'var(--space-sm)',
-              backgroundColor: 'var(--bg-primary)',
-              border: `1px solid ${errors.ip_address ? '#ef4444' : 'var(--border-primary)'}`,
+              backgroundColor: 'var(--bg-secondary)',
+              border: `1px solid ${errors.ip_address ? 'var(--status-error)' : 'var(--border-primary)'}`,
               borderRadius: 'var(--radius-sm)',
               color: 'var(--text-primary)',
               fontSize: 'var(--font-size-sm)',
               outline: 'none',
               transition: 'border-color 0.2s'
             }}
+            onFocus={(e) => {
+              e.target.style.borderColor = 'var(--primary-color)';
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = errors.ip_address ? 'var(--status-error)' : 'var(--border-primary)';
+            }}
           />
           {errors.ip_address && (
-            <span style={{ color: '#ef4444', fontSize: 'var(--font-size-xs)', marginTop: 'var(--space-xs)', display: 'block' }}>
+            <span style={{ color: 'var(--status-error)', fontSize: 'var(--font-size-xs)', marginTop: 'var(--space-xs)', display: 'block' }}>
               {errors.ip_address}
             </span>
           )}

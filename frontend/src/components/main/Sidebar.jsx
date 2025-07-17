@@ -10,6 +10,7 @@ const Sidebar = ({
   missions, 
   selectedRobot, 
   setSelectedRobot,
+  onShowRobotDetail,
   isLoading = false,
   isMobile = false,
   onClose
@@ -427,18 +428,66 @@ const Sidebar = ({
                   robot={robot}
                   isSelected={selectedRobot}
                   onSelect={setSelectedRobot}
+                  onDoubleClick={onShowRobotDetail}
                   isMobile={isMobile}
                 />
               ))
             ) : (
               // 작업 목록
-              missions.map(mission => (
-                <MissionCard
-                  key={mission.id}
-                  mission={mission}
-                  isMobile={isMobile}
-                />
-              ))
+              <>
+                {missions.map(mission => (
+                  <MissionCard
+                    key={mission.id}
+                    mission={mission}
+                    isMobile={isMobile}
+                  />
+                ))}
+                
+                {/* 작업 추가 버튼 */}
+                <button
+                  onClick={() => {
+                    // TODO: 작업 추가 모달 또는 페이지로 이동
+                    console.log('작업 추가 버튼 클릭');
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: isMobile ? 'var(--space-md)' : 'var(--space-lg)',
+                    marginTop: 'var(--space-md)',
+                    backgroundColor: 'var(--bg-tertiary)',
+                    border: '2px dashed var(--border-primary)',
+                    borderRadius: 'var(--radius-lg)',
+                    color: 'var(--text-secondary)',
+                    fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 'var(--space-sm)',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = 'var(--bg-primary)';
+                    e.target.style.borderColor = 'var(--primary-color)';
+                    e.target.style.color = 'var(--text-primary)';
+                    e.target.style.boxShadow = '0 0 20px rgba(0, 212, 255, 0.3)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'var(--bg-tertiary)';
+                    e.target.style.borderColor = 'var(--border-primary)';
+                    e.target.style.color = 'var(--text-secondary)';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                >
+                  <i className="fas fa-plus" style={{
+                    fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+                    opacity: 0.7
+                  }}></i>
+                  <span>새 작업 추가</span>
+                </button>
+              </>
             )}
           </>
         )}

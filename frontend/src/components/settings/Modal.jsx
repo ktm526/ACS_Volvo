@@ -39,7 +39,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)', // Safari 지원
         display: 'flex',
@@ -54,7 +54,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
         style={{
           backgroundColor: 'var(--bg-primary)',
           borderRadius: 'var(--radius-lg)',
-          boxShadow: '0 25px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 25px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--border-primary)',
           width: '100%',
           maxWidth: '600px',
           maxHeight: '90vh',

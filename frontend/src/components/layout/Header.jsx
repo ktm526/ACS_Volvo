@@ -3,6 +3,7 @@ import { useAppContext } from '../../contexts/AppContext.jsx';
 import { useRobots } from '../../hooks/useRobots';
 import { useSimulatedData } from '../../hooks/useSimulatedData';
 import { MENU_ITEMS } from '../../constants';
+import logoImage from '../../assets/signature04.png';
 
 const Header = () => {
   const { state, actions } = useAppContext();
@@ -101,6 +102,12 @@ const Header = () => {
     setShowRealTime(!showRealTime);
   };
 
+  // 테마 토글 핸들러
+  const handleThemeToggle = () => {
+    const newTheme = state.ui.theme === 'dark' ? 'light' : 'dark';
+    actions.updateUISetting('theme', newTheme);
+  };
+
   // 실행 시간 포맷팅 (HH:MM:SS)
   const formatRuntime = (seconds) => {
     const hours = Math.floor(seconds / 3600);
@@ -145,11 +152,22 @@ const Header = () => {
       {/* 브랜드 섹션 - 컴팩트 모드에서는 숨김 */}
       {!isCompact && (
         <div className="header-brand">
-          <div className="logo-icon">
-            <i className="fas fa-robot"></i>
+          <div className="logo-icon" style={{
+            background: 'transparent',
+            width: 'auto',
+            height: 'auto',
+            borderRadius: 0,
+            boxShadow: 'none'
+          }}>
+          <img src={logoImage} alt="logo" style={{
+            width: '120px',
+            height: '40px',
+            objectFit: 'contain',
+            margin: '0 auto'
+          }} />
           </div>
           <div>
-            <h1>ACS Control</h1>
+            {/* <h1>ACS Control</h1>
             <div style={{ 
               fontSize: 'var(--font-size-xs)', 
               color: 'var(--text-tertiary)',
@@ -157,7 +175,7 @@ const Header = () => {
               letterSpacing: '0.02em'
             }}>
               Autonomous Control System
-            </div>
+            </div> */}
           </div>
         </div>
       )}
@@ -219,7 +237,7 @@ const Header = () => {
                 // 활성 메뉴일 때는 배경 제거 (애니메이션 배경이 대신함)
                 background: 'transparent',
                 // 활성 메뉴 색상 변경
-                color: isActive ? '#ffffff' : 'var(--text-secondary)',
+                color: isActive ? (state.ui.theme === 'dark' ? '#ffffff' : '#2c3e50') : 'var(--text-secondary)',
                 transition: 'color 0.3s ease',
                 fontWeight: isActive ? '600' : '400'
               }}
@@ -235,8 +253,8 @@ const Header = () => {
                 }}
               ></i>
               <span style={{
-                color: isActive ? '#ffffff' : 'inherit',
-                textShadow: isActive ? '0 0 8px rgba(255, 255, 255, 0.3)' : 'none',
+                color: isActive ? (state.ui.theme === 'dark' ? '#ffffff' : '#2c3e50') : 'inherit',
+                textShadow: isActive && state.ui.theme === 'dark' ? '0 0 8px rgba(255, 255, 255, 0.3)' : 'none',
                 transition: 'all 0.3s ease'
               }}>
                 {item.label}
@@ -315,6 +333,30 @@ const Header = () => {
               : 'Disconnected'
             }
           </span>
+        </div>
+
+        {/* 4. 테마 토글 버튼 */}
+        <div 
+          className="status-indicator theme-toggle"
+          onClick={handleThemeToggle}
+          style={{
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            position: 'relative',
+            minWidth: 'auto'
+          }}
+          onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
+          onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+          title={state.ui.theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+        >
+          <i 
+            className={state.ui.theme === 'dark' ? "fas fa-sun" : "fas fa-moon"}
+            style={{
+              fontSize: '1rem',
+              color: state.ui.theme === 'dark' ? '#ffa500' : '#4169e1',
+              transition: 'all 0.3s ease'
+            }}
+          ></i>
         </div>
       </div>
 

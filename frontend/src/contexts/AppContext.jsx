@@ -3,6 +3,26 @@ import { ROBOT_STATUS, MISSION_STATUS } from '../constants';
 
 const AppContext = createContext();
 
+// localStorage에서 테마 설정 로드
+const loadThemeFromStorage = () => {
+  try {
+    const savedTheme = localStorage.getItem('theme');
+    return savedTheme || 'dark';
+  } catch (error) {
+    console.error('Failed to load theme from localStorage:', error);
+    return 'dark';
+  }
+};
+
+// localStorage에 테마 설정 저장
+const saveThemeToStorage = (theme) => {
+  try {
+    localStorage.setItem('theme', theme);
+  } catch (error) {
+    console.error('Failed to save theme to localStorage:', error);
+  }
+};
+
 // 초기 상태
 const initialState = {
   currentPage: 'main',
@@ -18,7 +38,7 @@ const initialState = {
   },
   ui: {
     showTooltips: true,
-    theme: 'dark',
+    theme: loadThemeFromStorage(),
     language: 'ko'
   }
 };
@@ -114,6 +134,11 @@ const appReducer = (state, action) => {
       };
 
     case ACTION_TYPES.UPDATE_UI_SETTING:
+      // 테마가 변경될 때 localStorage에 저장
+      if (action.payload.setting === 'theme') {
+        saveThemeToStorage(action.payload.value);
+      }
+      
       return {
         ...state,
         ui: {

@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { Line, Html } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
+import { useAppContext } from '../../contexts/AppContext';
 import * as THREE from 'three';
 
 // 테슬라 스타일 CSS 애니메이션 추가
@@ -203,7 +204,7 @@ function MapTexture({ mapInfo, visible = true }) {
 
 
 // 심플한 맵 노드 렌더링 컴포넌트
-function MapNode({ node, mapInfo, isSelected = false, onHover, onHoverEnd }) {
+function MapNode({ node, mapInfo, theme = 'dark', isSelected = false, onHover, onHoverEnd }) {
   const meshRef = useRef();
   const [hovered, setHovered] = useState(false);
   
@@ -219,14 +220,15 @@ function MapNode({ node, mapInfo, isSelected = false, onHover, onHoverEnd }) {
     type: node.type
   });
   
-  // Primary 컬러로 통일된 심플한 노드 설정 (1/4 크기로 축소)
+  // 테마에 따른 노드 설정 (1/4 크기로 축소)
   const nodeConfig = useMemo(() => {
+    const isDark = theme === 'dark';
     return { 
-      color: '#0080FF', // Primary 컬러로 통일
+      color: isDark ? '#0080FF' : '#0088cc', // 테마에 따른 Primary 컬러
       size: 0.075,      // 1/4 크기로 축소 (0.3 -> 0.075)
       height: 0.1       // 1/4 높이로 축소 (0.4 -> 0.1)
     };
-  }, []);
+  }, [theme]);
   
   // 심플한 애니메이션 효과
   useFrame((state) => {
@@ -275,25 +277,36 @@ function MapNode({ node, mapInfo, isSelected = false, onHover, onHoverEnd }) {
           center
         >
           <div style={{
-            background: 'rgba(0, 0, 0, 0.85)',
+            background: theme === 'dark' ? 'rgba(0, 0, 0, 0.85)' : 'rgba(255, 255, 255, 0.95)',
             backdropFilter: 'blur(10px)',
-            border: '1px solid #0080ff',
+            border: `1px solid ${nodeConfig.color}`,
             borderRadius: '8px',
             padding: '12px 16px',
-            color: '#ffffff',
+            color: theme === 'dark' ? '#ffffff' : '#2c3e50',
             fontFamily: 'Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
             fontSize: '13px',
             fontWeight: '500',
             textAlign: 'left',
             minWidth: '150px',
-            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.5), 0 0 8px rgba(0, 128, 255, 0.3)',
+            boxShadow: theme === 'dark' 
+              ? '0 4px 16px rgba(0, 0, 0, 0.5), 0 0 8px rgba(0, 128, 255, 0.3)'
+              : '0 4px 16px rgba(0, 0, 0, 0.1), 0 0 8px rgba(0, 136, 204, 0.15)',
             pointerEvents: 'none',
             transform: 'translate(-50%, -100%)'
           }}>
-            <div style={{ marginBottom: '8px', fontSize: '14px', fontWeight: '600', color: '#0080ff' }}>
+            <div style={{ 
+              marginBottom: '8px', 
+              fontSize: '14px', 
+              fontWeight: '600', 
+              color: theme === 'dark' ? '#0080ff' : '#0056b3'
+            }}>
               {node.name}
             </div>
-            <div style={{ fontSize: '12px', color: '#cccccc', lineHeight: '1.4' }}>
+            <div style={{ 
+              fontSize: '12px', 
+              color: theme === 'dark' ? '#cccccc' : '#6c757d', 
+              lineHeight: '1.4' 
+            }}>
               <div>Index: {node.node_index}</div>
               <div>Type: {node.type}</div>
               <div>Position: ({node.position_x.toFixed(2)}, {node.position_y.toFixed(2)})</div>
@@ -306,7 +319,7 @@ function MapNode({ node, mapInfo, isSelected = false, onHover, onHoverEnd }) {
 }
 
 // 심플한 맵 노드 연결선 렌더링 컴포넌트
-function MapConnection({ connection, nodes, mapInfo }) {
+function MapConnection({ connection, nodes, mapInfo, theme = 'dark' }) {
   const lineRef = useRef();
   
   const fromNode = nodes.find(n => n.node_index === connection.from_node_index);
@@ -325,8 +338,8 @@ function MapConnection({ connection, nodes, mapInfo }) {
     y: toNode.position_y
   };
   
-  // Primary 컬러로 통일
-  const connectionColor = '#0080FF';
+  // 테마에 따른 연결선 색상
+  const connectionColor = theme === 'dark' ? '#0080FF' : '#0088cc';
   
   // 심플한 직선 연결 (로봇 높이에 맞춰 조정)
   const points = [
@@ -365,6 +378,8 @@ const MapRenderer3D = ({
   onNodeHover,
   onNodeHoverEnd
 }) => {
+  const { state } = useAppContext();
+  const theme = state.ui.theme;
   const [hoveredNode, setHoveredNode] = useState(null);
   
   console.log('MapRenderer3D: props received', { 
@@ -404,6 +419,7 @@ const MapRenderer3D = ({
           connection={connection}
           nodes={nodes}
           mapInfo={map}
+          theme={theme}
         />
       ))}
       
@@ -413,6 +429,7 @@ const MapRenderer3D = ({
           key={node.id}
           node={node}
           mapInfo={map}
+          theme={theme}
           isSelected={selectedNode?.id === node.id}
           onHover={(node) => {
             setHoveredNode(node);

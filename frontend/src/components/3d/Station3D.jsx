@@ -1,9 +1,11 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html, Cylinder, Sphere } from '@react-three/drei';
 import * as THREE from 'three';
+import { useAppContext } from '../../contexts/AppContext';
 
 const Station3D = ({ station, isSelected = false, brandColors }) => {
+  const { theme } = useAppContext();
   const meshRef = useRef();
   const glowRef = useRef();
   const beaconRef = useRef();
@@ -176,7 +178,9 @@ const Station3D = ({ station, isSelected = false, brandColors }) => {
       >
         <div
           style={{
-            background: `linear-gradient(135deg, ${getStationColor(station.type)}22, ${getStationColor(station.type)}44)`,
+            background: theme === 'dark' 
+              ? `linear-gradient(135deg, ${getStationColor(station.type)}22, ${getStationColor(station.type)}44)` 
+              : `linear-gradient(135deg, ${getStationColor(station.type)}15, ${getStationColor(station.type)}30)`,
             border: `1px solid ${getStationColor(station.type)}`,
             borderRadius: '8px',
             padding: '6px 10px',
@@ -185,22 +189,31 @@ const Station3D = ({ station, isSelected = false, brandColors }) => {
             fontFamily: 'SF Pro Display, -apple-system, sans-serif',
             fontWeight: '600',
             textAlign: 'center',
-            textShadow: `0 0 8px ${getStationColor(station.type)}`,
+            textShadow: theme === 'dark' 
+              ? `0 0 8px ${getStationColor(station.type)}` 
+              : `0 0 4px ${getStationColor(station.type)}`,
             backdropFilter: 'blur(10px)',
-            boxShadow: `0 0 20px ${getStationColor(station.type)}33`,
+            boxShadow: theme === 'dark' 
+              ? `0 0 20px ${getStationColor(station.type)}33` 
+              : `0 0 15px ${getStationColor(station.type)}20`,
             opacity: isSelected ? 1 : 0.8,
             transform: `scale(${isSelected ? 1.1 : 1})`,
             transition: 'all 0.3s ease'
           }}
         >
-          <div style={{ fontWeight: '700', marginBottom: '2px' }}>
+          <div style={{ 
+            fontWeight: '700', 
+            marginBottom: '2px',
+            color: theme === 'dark' ? '#ffffff' : '#2c3e50'
+          }}>
             {station.name || `Station ${station.id}`}
           </div>
           <div style={{ 
             fontSize: '9px', 
             opacity: 0.8,
             textTransform: 'uppercase',
-            letterSpacing: '0.5px'
+            letterSpacing: '0.5px',
+            color: theme === 'dark' ? '#cccccc' : '#6c757d'
           }}>
             {station.type}
           </div>
