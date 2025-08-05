@@ -5,6 +5,7 @@ class Robot {
     this.id = data.id;
     this.name = data.name;
     this.ip_address = data.ip_address;
+    this.port = data.port;
     this.status = data.status || 'idle';
     this.battery = data.battery || 100;
     this.location_x = data.location_x || 0;
@@ -65,13 +66,13 @@ class Robot {
   static create(data) {
     const db = getDatabase();
     return new Promise((resolve, reject) => {
-      const { name, ip_address, status = 'idle', battery = 100, location_x = 0, location_y = 0, angle = 0 } = data;
+      const { name, ip_address, port = 80, status = 'idle', battery = 100, location_x = 0, location_y = 0, angle = 0 } = data;
       const currentTime = new Date().toISOString();
       
       db.run(
-        `INSERT INTO robots (name, ip_address, status, battery, location_x, location_y, angle, connection_status, last_updated, last_status_check) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [name, ip_address, status, battery, location_x, location_y, angle, true, currentTime, currentTime],
+        `INSERT INTO robots (name, ip_address, port, status, battery, location_x, location_y, angle, connection_status, last_updated, last_status_check) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [name, ip_address, port, status, battery, location_x, location_y, angle, true, currentTime, currentTime],
         function(err) {
           if (err) {
             reject(err);
@@ -243,6 +244,12 @@ class Robot {
       const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
       if (!ipRegex.test(data.ip_address.trim())) {
         errors.push('올바른 IP 주소 형식을 입력해주세요.');
+      }
+    }
+    
+    if (data.port !== undefined) {
+      if (typeof data.port !== 'number' || data.port < 1 || data.port > 65535) {
+        errors.push('포트 번호는 1-65535 사이의 숫자여야 합니다.');
       }
     }
     

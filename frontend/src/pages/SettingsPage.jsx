@@ -1130,9 +1130,14 @@ const SettingsPage = () => {
                                                'var(--warning-color)'
                               }}
                             />
-                            <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: '500' }}>
-                              {robot.name}
-                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: '500' }}>
+                                {robot.name}
+                              </span>
+                              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>
+                                {robot.ip_address}{robot.port ? `:${robot.port}` : ''}
+                              </span>
+                            </div>
                             <span style={{ 
                               fontSize: 'var(--font-size-xs)', 
                               color: 'var(--text-tertiary)',

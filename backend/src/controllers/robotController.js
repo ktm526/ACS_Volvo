@@ -45,15 +45,17 @@ const robotController = {
       }
 
       // default 값 설정
-      let { name, ip_address, status, battery, location_x, location_y } = req.body;
+      let { name, ip_address, port, status, battery, location_x, location_y } = req.body;
       status = status || 'idle';
       battery = battery !== undefined ? battery : 100;
       location_x = location_x !== undefined ? location_x : 0;
       location_y = location_y !== undefined ? location_y : 0;
+      port = port !== undefined ? port : 80;
 
       const robot = await Robot.create({
         name: name.trim(),
         ip_address: ip_address.trim(),
+        port,
         status,
         battery,
         location_x,

@@ -13,6 +13,7 @@ const initializeDatabase = () => {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL,
           ip_address TEXT,
+          port INTEGER DEFAULT 80,
           status TEXT DEFAULT 'idle',
           battery INTEGER DEFAULT 100,
           location_x REAL DEFAULT 0,
@@ -54,6 +55,7 @@ const initializeDatabase = () => {
 
       // 기존 robots 테이블에 새 컬럼들 추가 (이미 테이블이 존재하는 경우)
       const newColumns = [
+        'ALTER TABLE robots ADD COLUMN port INTEGER DEFAULT 80',
         'ALTER TABLE robots ADD COLUMN robot_model TEXT',
         'ALTER TABLE robots ADD COLUMN hw_version TEXT', 
         'ALTER TABLE robots ADD COLUMN sw_version TEXT',

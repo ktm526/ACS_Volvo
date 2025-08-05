@@ -3,7 +3,8 @@ import React, { useState } from 'react';
 const RobotAddForm = ({ onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
     name: '',
-    ip_address: ''
+    ip_address: '',
+    port: ''
   });
 
   const [errors, setErrors] = useState({});
@@ -40,6 +41,15 @@ const RobotAddForm = ({ onSubmit, onCancel }) => {
       }
     }
 
+    if (!formData.port.trim()) {
+      newErrors.port = '포트 번호를 입력해주세요.';
+    } else {
+      const port = parseInt(formData.port);
+      if (isNaN(port) || port < 1 || port > 65535) {
+        newErrors.port = '포트 번호는 1-65535 범위의 숫자여야 합니다.';
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -47,7 +57,12 @@ const RobotAddForm = ({ onSubmit, onCancel }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (validateForm()) {
-      onSubmit(formData);
+      // 포트를 숫자로 변환하여 전송
+      const submissionData = {
+        ...formData,
+        port: parseInt(formData.port)
+      };
+      onSubmit(submissionData);
     }
   };
 
@@ -55,7 +70,7 @@ const RobotAddForm = ({ onSubmit, onCancel }) => {
     <form onSubmit={handleSubmit}>
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
         gap: 'var(--space-md)'
       }}>
         {/* 로봇 이름 */}
@@ -138,6 +153,50 @@ const RobotAddForm = ({ onSubmit, onCancel }) => {
           {errors.ip_address && (
             <span style={{ color: 'var(--status-error)', fontSize: 'var(--font-size-xs)', marginTop: 'var(--space-xs)', display: 'block' }}>
               {errors.ip_address}
+            </span>
+          )}
+        </div>
+
+        {/* 포트 번호 */}
+        <div>
+          <label style={{
+            display: 'block',
+            marginBottom: 'var(--space-xs)',
+            color: 'var(--text-primary)',
+            fontSize: 'var(--font-size-sm)',
+            fontWeight: 500
+          }}>
+            포트 번호 *
+          </label>
+          <input
+            type="number"
+            name="port"
+            value={formData.port}
+            onChange={handleChange}
+            placeholder="예: 8080"
+            min="1"
+            max="65535"
+            style={{
+              width: '100%',
+              padding: 'var(--space-sm)',
+              backgroundColor: 'var(--bg-secondary)',
+              border: `1px solid ${errors.port ? 'var(--status-error)' : 'var(--border-primary)'}`,
+              borderRadius: 'var(--radius-sm)',
+              color: 'var(--text-primary)',
+              fontSize: 'var(--font-size-sm)',
+              outline: 'none',
+              transition: 'border-color 0.2s'
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = 'var(--primary-color)';
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = errors.port ? 'var(--status-error)' : 'var(--border-primary)';
+            }}
+          />
+          {errors.port && (
+            <span style={{ color: 'var(--status-error)', fontSize: 'var(--font-size-xs)', marginTop: 'var(--space-xs)', display: 'block' }}>
+              {errors.port}
             </span>
           )}
         </div>

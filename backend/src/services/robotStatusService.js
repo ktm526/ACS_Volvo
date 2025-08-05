@@ -85,8 +85,9 @@ class RobotStatusService {
     }
 
     try {
-      const url = `http://${robot.ip_address}/api/v1/AMR/status`;
-      console.log(`로봇 ${robot.name} (${robot.ip_address}) 상태 요청 중...`);
+      const port = robot.port || 80;
+      const url = `http://${robot.ip_address}:${port}/api/v1/AMR/status`;
+      console.log(`로봇 ${robot.name} (${robot.ip_address}:${port}) 상태 요청 중...`);
 
       const response = await axios.get(url, {
         timeout: this.httpTimeout,
@@ -112,7 +113,8 @@ class RobotStatusService {
       }
 
     } catch (error) {
-      console.error(`로봇 ${robot.name} (${robot.ip_address}) 상태 수집 실패:`, error.message);
+      const port = robot.port || 80;
+      console.error(`로봇 ${robot.name} (${robot.ip_address}:${port}) 상태 수집 실패:`, error.message);
       
       // 연결 실패 - 상태 업데이트
       const errorMsg = `연결 실패: ${error.message}`;
