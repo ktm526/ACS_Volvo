@@ -72,7 +72,8 @@ export const PATHS = [
 // API 엔드포인트
 export const API_ENDPOINTS = {
   ROBOTS: '/api/robots',
-  MISSIONS: '/api/missions'
+  MISSIONS: '/api/missions',
+  MOVE_REQUEST: '/api/robots/move'
 };
 
 // 메뉴 아이템
@@ -125,6 +126,7 @@ export const ROBOT_STATUS_COLORS = {
   WORKING: '#F59E0B',       // 주황색 (작업중)
   CHARGING: '#F59E0B',      // 주황색 (충전중)
   ERROR: '#EF4444',         // 빨간색 (오류)
+  DISCONNECTED: '#6B7280',  // 회색 (연결 끊김)
   DEFAULT: '#6B7280'        // 회색 (기본)
 };
 
@@ -145,6 +147,8 @@ export const getStatusColor = (status, type = 'mission') => {
         return ROBOT_STATUS_COLORS.CHARGING;
       case 'error':
         return ROBOT_STATUS_COLORS.ERROR;
+      case 'disconnected':
+        return ROBOT_STATUS_COLORS.DISCONNECTED;
       default:
         return ROBOT_STATUS_COLORS.DEFAULT;
     }

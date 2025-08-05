@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { Line, Html } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useAppContext } from '../../contexts/AppContext';
+import { COLORS } from '../../constants';
 import * as THREE from 'three';
 
 // 테슬라 스타일 CSS 애니메이션 추가
@@ -204,9 +205,12 @@ function MapTexture({ mapInfo, visible = true }) {
 
 
 // 심플한 맵 노드 렌더링 컴포넌트
-function MapNode({ node, mapInfo, theme = 'dark', isSelected = false, onHover, onHoverEnd }) {
+function MapNode({ node, mapInfo, theme = 'dark', isSelected = false, onHover, onHoverEnd, onRightClick, robots = [], onMoveRequest }) {
   const meshRef = useRef();
   const [hovered, setHovered] = useState(false);
+  const [contextMenuMode, setContextMenuMode] = useState(false);
+  const [selectedRobot, setSelectedRobot] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   
   // ROS 맵 좌표계: 노드 좌표는 이미 실제 미터 단위 좌표이므로 그대로 사용
   const transformedPos = {
@@ -220,13 +224,14 @@ function MapNode({ node, mapInfo, theme = 'dark', isSelected = false, onHover, o
     type: node.type
   });
   
-  // 테마에 따른 노드 설정 (1/4 크기로 축소)
+  // 테마에 따른 노드 설정
   const nodeConfig = useMemo(() => {
     const isDark = theme === 'dark';
     return { 
-      color: isDark ? '#0080FF' : '#0088cc', // 테마에 따른 Primary 컬러
-      size: 0.075,      // 1/4 크기로 축소 (0.3 -> 0.075)
-      height: 0.1       // 1/4 높이로 축소 (0.4 -> 0.1)
+      color: isDark ? COLORS.PRIMARY : '#0088ff', // 라이트 테마에서 더 밝은 파란색
+      size: 0.075,      // 기본 크기
+      height: 0.1,      // 기본 높이
+      hoverSize: 0.15   // 호버 영역 크기 (2배로 확대)
     };
   }, [theme]);
   
@@ -242,23 +247,126 @@ function MapNode({ node, mapInfo, theme = 'dark', isSelected = false, onHover, o
       }
     }
   });
+
+  const handleRightClick = (e) => {
+    e.stopPropagation();
+    setContextMenuMode(true);
+    setSelectedRobot(null);
+    setHovered(true); // 강제로 hover 상태 유지
+  };
+
+  const handleCloseContextMenu = () => {
+    setContextMenuMode(false);
+    setSelectedRobot(null);
+    setIsLoading(false);
+    setHovered(false); // hover 상태도 해제
+  };
+
+  const handleMoveRequest = async () => {
+    if (!selectedRobot || !node || !onMoveRequest) return;
+    
+    setIsLoading(true);
+    try {
+      await onMoveRequest(selectedRobot.id, node.id);
+      handleCloseContextMenu();
+    } catch (error) {
+      console.error('AMR 이동 요청 실패:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 모든 로봇 표시 (필터링 제거)
+  const allRobots = robots || [];
+
+  // 로봇 상태별 색상과 아이콘
+  const getStatusInfo = (status) => {
+    switch (status) {
+      case 'moving':
+        return { color: '#3B82F6', icon: '▶', text: '이동중', available: false };
+      case 'idle':
+        return { color: '#22C55E', icon: '⏸', text: '대기중', available: true };
+      case 'charging':
+        return { color: '#F59E0B', icon: '⚡', text: '충전중', available: true };
+      case 'working':
+        return { color: '#F59E0B', icon: '⚙', text: '작업중', available: false };
+      case 'error':
+        return { color: '#EF4444', icon: '✕', text: '오류', available: false };
+      case 'disconnected':
+        return { color: '#6B7280', icon: '⚠', text: '연결끊김', available: false };
+      default:
+        return { color: '#6B7280', icon: '●', text: '알수없음', available: false };
+    }
+  };
+
+  const themeColors = {
+    background: theme === 'dark' ? '#1a1a1a' : '#ffffff',
+    textPrimary: theme === 'dark' ? '#ffffff' : '#2c3e50',
+    textSecondary: theme === 'dark' ? '#cccccc' : '#6c757d',
+    border: theme === 'dark' ? '#333333' : '#e0e0e0',
+    buttonPrimary: '#3B82F6',
+    buttonHover: '#2563EB',
+    robotItem: theme === 'dark' ? '#2a2a2a' : '#f8f9fa',
+    robotItemHover: theme === 'dark' ? '#363636' : '#e9ecef',
+    robotItemDisabled: theme === 'dark' ? '#1a1a1a' : '#f0f0f0'
+  };
+
+  // 외부 클릭 감지를 위한 useEffect
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (contextMenuMode) {
+        // 툴팁 내부 클릭이 아닌 경우에만 닫기
+        const target = event.target;
+        const isInsideTooltip = target.closest('[data-tooltip-content]');
+        if (!isInsideTooltip) {
+          handleCloseContextMenu();
+        }
+      }
+    };
+
+    if (contextMenuMode) {
+      // 약간의 지연을 두어 우클릭 이벤트와 충돌 방지
+      setTimeout(() => {
+        document.addEventListener('click', handleOutsideClick);
+        document.addEventListener('contextmenu', handleOutsideClick);
+      }, 100);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleOutsideClick);
+      document.removeEventListener('contextmenu', handleOutsideClick);
+    };
+  }, [contextMenuMode]);
   
   return (
     <group>
-      {/* 네모 모양 노드 (완전 불투명) */}
+      {/* 투명한 호버 영역 (더 큰 범위) */}
       <mesh
-        ref={meshRef}
         position={[transformedPos.x, nodeConfig.height / 2, -transformedPos.y]}
         onPointerOver={(e) => {
           e.stopPropagation();
-          setHovered(true);
-          onHover?.(node);
+          if (!contextMenuMode) {
+            setHovered(true);
+            onHover?.(node);
+          }
         }}
         onPointerOut={(e) => {
           e.stopPropagation();
-          setHovered(false);
-          onHoverEnd?.();
+          if (!contextMenuMode) {
+            setHovered(false);
+            onHoverEnd?.();
+          }
         }}
+        onContextMenu={handleRightClick}
+      >
+        <boxGeometry args={[nodeConfig.hoverSize * 2, nodeConfig.height * 2, nodeConfig.hoverSize * 2]} />
+        <meshBasicMaterial transparent opacity={0} />
+      </mesh>
+      
+      {/* 실제 노드 표시 (네모 모양) */}
+      <mesh
+        ref={meshRef}
+        position={[transformedPos.x, nodeConfig.height / 2, -transformedPos.y]}
       >
         <boxGeometry args={[nodeConfig.size * 2, nodeConfig.height, nodeConfig.size * 2]} />
         <meshStandardMaterial
@@ -270,48 +378,320 @@ function MapNode({ node, mapInfo, theme = 'dark', isSelected = false, onHover, o
         />
       </mesh>
       
-      {/* 심플한 노드 정보창 */}
+      {/* 툴팁 (일반 모드 또는 컨텍스트 메뉴 모드) */}
       {(hovered || isSelected) && (
         <Html 
-          position={[transformedPos.x, nodeConfig.height + 0.3, -transformedPos.y]}
+          position={[transformedPos.x, nodeConfig.height + 0.8, -transformedPos.y]}
           center
+          style={{
+            transform: 'translate(-50%, -100%)',
+            zIndex: 10000,
+            pointerEvents: contextMenuMode ? 'all' : 'none'
+          }}
         >
-          <div style={{
-            background: theme === 'dark' ? 'rgba(0, 0, 0, 0.85)' : 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(10px)',
-            border: `1px solid ${nodeConfig.color}`,
-            borderRadius: '8px',
-            padding: '12px 16px',
-            color: theme === 'dark' ? '#ffffff' : '#2c3e50',
-            fontFamily: 'Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
-            fontSize: '13px',
-            fontWeight: '500',
-            textAlign: 'left',
-            minWidth: '150px',
-            boxShadow: theme === 'dark' 
-              ? '0 4px 16px rgba(0, 0, 0, 0.5), 0 0 8px rgba(0, 128, 255, 0.3)'
-              : '0 4px 16px rgba(0, 0, 0, 0.1), 0 0 8px rgba(0, 136, 204, 0.15)',
-            pointerEvents: 'none',
-            transform: 'translate(-50%, -100%)'
-          }}>
-            <div style={{ 
-              marginBottom: '8px', 
-              fontSize: '14px', 
-              fontWeight: '600', 
-              color: theme === 'dark' ? '#0080ff' : '#0056b3'
-            }}>
-              {node.name}
-            </div>
-            <div style={{ 
-              fontSize: '12px', 
-              color: theme === 'dark' ? '#cccccc' : '#6c757d', 
-              lineHeight: '1.4' 
-            }}>
-              <div>Index: {node.node_index}</div>
-              <div>Type: {node.type}</div>
-              <div>Position: ({node.position_x.toFixed(2)}, {node.position_y.toFixed(2)})</div>
-            </div>
+          <div 
+            data-tooltip-content
+            style={{
+              background: themeColors.background,
+              backdropFilter: 'blur(10px)',
+              borderRadius: '16px',
+              padding: '16px 20px',
+              color: themeColors.textPrimary,
+              fontFamily: 'Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
+              fontSize: '13px',
+              fontWeight: '500',
+              textAlign: 'left',
+              minWidth: contextMenuMode ? '280px' : '240px',
+              maxWidth: contextMenuMode ? '350px' : '300px',
+              boxShadow: theme === 'dark' 
+                ? `0 0 20px ${nodeConfig.color}40, 0 4px 16px rgba(0, 0, 0, 0.5)`
+                : `0 0 20px ${nodeConfig.color}30, 0 4px 16px rgba(0, 0, 0, 0.15)`,
+              position: 'relative'
+            }}
+          >
+            {contextMenuMode ? (
+              /* AMR 선택 메뉴 */
+              <>
+                {/* 헤더 */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '12px',
+                  paddingBottom: '8px',
+                  borderBottom: `1px solid ${themeColors.border}`
+                }}>
+                  <div>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: '700',
+                      color: themeColors.textPrimary
+                    }}>
+                      AMR 이동
+                    </div>
+                    <div style={{
+                      fontSize: '12px',
+                      color: themeColors.textSecondary,
+                      marginTop: '2px'
+                    }}>
+                      {node.name} (#{node.node_index})
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleCloseContextMenu}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: themeColors.textSecondary,
+                      fontSize: '18px',
+                      cursor: 'pointer',
+                      padding: '4px',
+                      borderRadius: '4px'
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* AMR 리스트 */}
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: themeColors.textPrimary,
+                    marginBottom: '8px'
+                  }}>
+                    모든 AMR ({allRobots.length}개)
+                  </div>
+                  
+                  {allRobots.length === 0 ? (
+                    <div style={{
+                      padding: '12px',
+                      textAlign: 'center',
+                      color: themeColors.textSecondary,
+                      fontSize: '13px',
+                      backgroundColor: themeColors.robotItem,
+                      borderRadius: '8px'
+                    }}>
+                      등록된 AMR이 없습니다
+                    </div>
+                  ) : (
+                    <div style={{
+                      maxHeight: '200px',
+                      overflowY: 'auto'
+                    }}>
+                      {allRobots.map(robot => {
+                        const statusInfo = getStatusInfo(robot.status);
+                        const isAvailable = statusInfo.available;
+                        const isSelectedRobot = selectedRobot?.id === robot.id;
+                        
+                        return (
+                          <div
+                            key={robot.id}
+                            onClick={() => isAvailable && setSelectedRobot(robot)}
+                            style={{
+                              padding: '8px 12px',
+                              margin: '3px 0',
+                              borderRadius: '6px',
+                              cursor: isAvailable ? 'pointer' : 'not-allowed',
+                              backgroundColor: isSelectedRobot 
+                                ? themeColors.buttonPrimary 
+                                : 'transparent',
+                              color: isSelectedRobot 
+                                ? '#ffffff' 
+                                : isAvailable 
+                                  ? themeColors.textPrimary 
+                                  : themeColors.textSecondary,
+                              border: isSelectedRobot 
+                                ? `1px solid ${themeColors.buttonPrimary}` 
+                                : '1px solid transparent',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '12px',
+                              transition: 'all 0.2s ease',
+                              opacity: isAvailable ? 1 : 0.5
+                            }}
+                            onMouseEnter={(e) => {
+                              if (isAvailable && !isSelectedRobot) {
+                                e.target.style.backgroundColor = themeColors.robotItem;
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (isAvailable && !isSelectedRobot) {
+                                e.target.style.backgroundColor = 'transparent';
+                              }
+                            }}
+                          >
+                            {/* 상태 인디케이터 점 */}
+                            <div style={{
+                              width: '10px',
+                              height: '10px',
+                              borderRadius: '50%',
+                              backgroundColor: statusInfo.color,
+                              border: `2px solid ${statusInfo.color}40`,
+                              boxShadow: `0 0 8px ${statusInfo.color}60`,
+                              flexShrink: 0
+                            }}></div>
+                            
+                            {/* 로봇 이름 */}
+                            <div style={{
+                              fontSize: '14px',
+                              fontWeight: '500',
+                              flex: 1
+                            }}>
+                              {robot.name || robot.id}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* 버튼들 */}
+                <div style={{
+                  display: 'flex',
+                  gap: '8px',
+                  justifyContent: 'flex-end'
+                }}>
+                  <button
+                    onClick={handleCloseContextMenu}
+                    style={{
+                      padding: '8px 16px',
+                      border: `1px solid ${themeColors.border}`,
+                      borderRadius: '6px',
+                      backgroundColor: 'transparent',
+                      color: themeColors.textSecondary,
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      fontWeight: '500'
+                    }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleMoveRequest}
+                    disabled={!selectedRobot || isLoading || allRobots.length === 0 || !getStatusInfo(selectedRobot?.status).available}
+                    style={{
+                      padding: '8px 16px',
+                      border: 'none',
+                      borderRadius: '6px',
+                      backgroundColor: (!selectedRobot || isLoading || allRobots.length === 0 || !getStatusInfo(selectedRobot?.status).available) 
+                        ? themeColors.textSecondary 
+                        : themeColors.buttonPrimary,
+                      color: '#ffffff',
+                      fontSize: '14px',
+                      cursor: (!selectedRobot || isLoading || allRobots.length === 0 || !getStatusInfo(selectedRobot?.status).available) 
+                        ? 'not-allowed' 
+                        : 'pointer',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    {isLoading && (
+                      <div style={{
+                        width: '12px',
+                        height: '12px',
+                        border: '2px solid transparent',
+                        borderTop: '2px solid #ffffff',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite'
+                      }} />
+                    )}
+                    {isLoading ? '이동 중...' : '이동'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* 일반 노드 정보 툴팁 */
+              <>
+                {/* 헤더 */}
+                <div style={{ 
+                  marginBottom: '12px', 
+                  paddingBottom: '8px',
+                  borderBottom: `1px solid ${theme === 'dark' ? '#333333' : '#e0e0e0'}`,
+                  fontSize: '15px', 
+                  fontWeight: '700', 
+                  color: nodeConfig.color,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <div style={{
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    backgroundColor: nodeConfig.color,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '8px',
+                    color: '#ffffff',
+                    fontWeight: '600'
+                  }}>
+                    {node.node_index}
+                  </div>
+                  {node.name}
+                </div>
+                
+                {/* 상세 정보 */}
+                <div style={{ 
+                  fontSize: '12px', 
+                  color: theme === 'dark' ? '#cccccc' : '#6c757d', 
+                  lineHeight: '1.5',
+                  display: 'grid',
+                  gridTemplateColumns: 'auto 1fr',
+                  gap: '6px 12px'
+                }}>
+                  <span style={{ fontWeight: '600', color: theme === 'dark' ? '#ffffff' : '#2c3e50' }}>Index:</span>
+                  <span>{node.node_index}</span>
+                  
+                  <span style={{ fontWeight: '600', color: theme === 'dark' ? '#ffffff' : '#2c3e50' }}>Type:</span>
+                  <span>{node.type}</span>
+                  
+                  <span style={{ fontWeight: '600', color: theme === 'dark' ? '#ffffff' : '#2c3e50' }}>Position:</span>
+                  <span style={{ fontFamily: 'monospace' }}>
+                    ({node.position_x.toFixed(2)}, {node.position_y.toFixed(2)})
+                  </span>
+                </div>
+
+                {/* 우클릭 안내 */}
+                <div style={{
+                  marginTop: '12px',
+                  paddingTop: '8px',
+                  borderTop: `1px solid ${theme === 'dark' ? '#333333' : '#e0e0e0'}`,
+                  fontSize: '11px',
+                  color: theme === 'dark' ? '#888888' : '#999999',
+                  textAlign: 'center'
+                }}>
+                  우클릭하여 AMR 이동
+                </div>
+              </>
+            )}
+            
+            {/* 말풍선 꼬리 */}
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '0',
+              height: '0',
+              borderLeft: '16px solid transparent',
+              borderRight: '16px solid transparent',
+              borderTop: `16px solid ${themeColors.background}`,
+              filter: `drop-shadow(0 2px 4px ${theme === 'dark' ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.1)'})`
+            }}></div>
           </div>
+
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
         </Html>
       )}
     </group>
@@ -339,7 +719,7 @@ function MapConnection({ connection, nodes, mapInfo, theme = 'dark' }) {
   };
   
   // 테마에 따른 연결선 색상
-  const connectionColor = theme === 'dark' ? '#0080FF' : '#0088cc';
+  const connectionColor = theme === 'dark' ? COLORS.PRIMARY : '#0056b3';
   
   // 심플한 직선 연결 (로봇 높이에 맞춰 조정)
   const points = [
@@ -376,7 +756,9 @@ const MapRenderer3D = ({
   showConnections = true,
   selectedNode = null,
   onNodeHover,
-  onNodeHoverEnd
+  onNodeHoverEnd,
+  robots = [],
+  onMoveRequest
 }) => {
   const { state } = useAppContext();
   const theme = state.ui.theme;
@@ -386,7 +768,8 @@ const MapRenderer3D = ({
     mapData: mapData ? { id: mapData.map?.id, name: mapData.map?.name } : null,
     showTexture,
     showNodes,
-    showConnections
+    showConnections,
+    robotsCount: robots.length
   });
   
   if (!mapData) {
@@ -439,6 +822,8 @@ const MapRenderer3D = ({
             setHoveredNode(null);
             onNodeHoverEnd?.();
           }}
+          robots={robots}
+          onMoveRequest={onMoveRequest}
         />
       ))}
 

@@ -151,13 +151,14 @@ app.get('/api/robots/:id', (req, res) => {
 // 새 로봇 생성
 app.post('/api/robots', (req, res) => {
   // destructuring으로 default 값 설정, undefined일 경우 default 값 사용
-  let { name, ip_address, status, battery, location_x, location_y } = req.body;
+  let { name, ip_address, status, battery, location_x, location_y, angle } = req.body;
   
   // default 값 설정
   status = status || 'idle';
   battery = battery !== undefined ? battery : 100;
   location_x = location_x !== undefined ? location_x : 0;
   location_y = location_y !== undefined ? location_y : 0;
+  angle = angle !== undefined ? angle : 0;
   
   // 필수 필드 검증
   if (!name || name.trim() === '') {
@@ -190,9 +191,14 @@ app.post('/api/robots', (req, res) => {
     return res.status(400).json({ error: '위치 좌표는 숫자여야 합니다.' });
   }
   
+  // 각도 검증
+  if (typeof angle !== 'number' || angle < -Math.PI || angle > Math.PI) {
+    return res.status(400).json({ error: '각도는 -π ~ π 라디안 범위의 숫자여야 합니다.' });
+  }
+  
   db.run(
-    'INSERT INTO robots (name, ip_address, status, battery, location_x, location_y, last_updated) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
-    [name.trim(), ip_address.trim(), status, battery, location_x, location_y],
+    'INSERT INTO robots (name, ip_address, status, battery, location_x, location_y, angle, last_updated) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
+    [name.trim(), ip_address.trim(), status, battery, location_x, location_y, angle],
     function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
@@ -217,7 +223,7 @@ app.post('/api/robots', (req, res) => {
 // 로봇 정보 업데이트
 app.put('/api/robots/:id', (req, res) => {
   const id = parseInt(req.params.id);
-  const { name, ip_address, status, battery, location_x, location_y } = req.body;
+  const { name, ip_address, status, battery, location_x, location_y, angle } = req.body;
   
   if (isNaN(id)) {
     return res.status(400).json({ error: '유효하지 않은 로봇 ID입니다.' });
@@ -292,6 +298,14 @@ app.put('/api/robots/:id', (req, res) => {
       values.push(location_y);
     }
     
+    if (angle !== undefined) {
+      if (typeof angle !== 'number' || angle < -Math.PI || angle > Math.PI) {
+        return res.status(400).json({ error: '각도는 -π ~ π 라디안 범위의 숫자여야 합니다.' });
+      }
+      updates.push('angle = ?');
+      values.push(angle);
+    }
+    
     if (updates.length === 0) {
       return res.status(400).json({ error: '업데이트할 필드가 없습니다.' });
     }
@@ -361,6 +375,85 @@ app.delete('/api/robots/:id', (req, res) => {
             message: '로봇이 성공적으로 삭제되었습니다.', 
             deletedRobot: row 
           });
+        });
+      });
+    });
+  });
+});
+
+// 로봇 위치 업데이트
+app.patch('/api/robots/:id/location', (req, res) => {
+  const id = parseInt(req.params.id);
+  const { x, y, angle } = req.body;
+  
+  if (isNaN(id)) {
+    return res.status(400).json({ error: '유효하지 않은 로봇 ID입니다.' });
+  }
+  
+  // 먼저 로봇 존재 확인
+  db.get('SELECT * FROM robots WHERE id = ?', [id], (err, row) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    
+    if (!row) {
+      return res.status(404).json({ error: '로봇을 찾을 수 없습니다.' });
+    }
+    
+    // 업데이트할 필드들 검증
+    const updates = [];
+    const values = [];
+    
+    if (x !== undefined) {
+      if (typeof x !== 'number') {
+        return res.status(400).json({ error: 'X 좌표는 숫자여야 합니다.' });
+      }
+      updates.push('location_x = ?');
+      values.push(x);
+    }
+    
+    if (y !== undefined) {
+      if (typeof y !== 'number') {
+        return res.status(400).json({ error: 'Y 좌표는 숫자여야 합니다.' });
+      }
+      updates.push('location_y = ?');
+      values.push(y);
+    }
+    
+    if (angle !== undefined) {
+      if (typeof angle !== 'number' || angle < -Math.PI || angle > Math.PI) {
+        return res.status(400).json({ error: '각도는 -π ~ π 라디안 범위의 숫자여야 합니다.' });
+      }
+      updates.push('angle = ?');
+      values.push(angle);
+    }
+    
+    if (updates.length === 0) {
+      return res.status(400).json({ error: '업데이트할 필드가 없습니다.' });
+    }
+    
+    // last_updated 항상 업데이트
+    updates.push('last_updated = CURRENT_TIMESTAMP');
+    values.push(id);
+    
+    const query = `UPDATE robots SET ${updates.join(', ')} WHERE id = ?`;
+    
+    db.run(query, values, function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      
+      // 업데이트된 로봇 정보 반환
+      db.get('SELECT * FROM robots WHERE id = ?', [id], (err, updatedRow) => {
+        if (err) {
+          res.status(500).json({ error: err.message });
+          return;
+        }
+        res.json({ 
+          message: '로봇 위치가 성공적으로 업데이트되었습니다.', 
+          data: updatedRow 
         });
       });
     });

@@ -9,6 +9,7 @@ export const useSimulatedData = (liveDataEnabled = true) => {
       status: 'moving',
       location_x: -5,
       location_y: 3,
+      angle: 0, // 동쪽 방향
       battery: 85,
       currentMission: '물품 운반 중',
       destination: '작업장 B',
@@ -23,6 +24,7 @@ export const useSimulatedData = (liveDataEnabled = true) => {
       status: 'charging',
       location_x: -8,
       location_y: 8,
+      angle: Math.PI / 2, // 북쪽 방향
       battery: 15,
       currentMission: '충전 중',
       destination: '충전소 A',
@@ -37,6 +39,7 @@ export const useSimulatedData = (liveDataEnabled = true) => {
       status: 'idle',
       location_x: 0,
       location_y: 0,
+      angle: -Math.PI / 4, // 북서쪽 방향
       battery: 67,
       currentMission: '대기 중',
       destination: null,
@@ -51,6 +54,7 @@ export const useSimulatedData = (liveDataEnabled = true) => {
       status: 'moving',
       location_x: 6,
       location_y: -4,
+      angle: Math.PI, // 서쪽 방향
       battery: 92,
       currentMission: '검수 작업',
       destination: '검수장 C',
@@ -65,6 +69,7 @@ export const useSimulatedData = (liveDataEnabled = true) => {
       status: 'error',
       location_x: 2,
       location_y: -6,
+      angle: -Math.PI / 2, // 남쪽 방향
       battery: 43,
       currentMission: '오류 발생',
       destination: null,

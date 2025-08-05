@@ -7,7 +7,7 @@ const initializeDatabase = () => {
     db.serialize(() => {
       // 기존 테이블이 없으면 생성 (데이터 보존)
       
-      // 로봇 정보 테이블
+      // 로봇 정보 테이블 (AMR 상태 정보 통합)
       db.run(`
         CREATE TABLE IF NOT EXISTS robots (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -17,7 +17,31 @@ const initializeDatabase = () => {
           battery INTEGER DEFAULT 100,
           location_x REAL DEFAULT 0,
           location_y REAL DEFAULT 0,
-          last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+          angle REAL DEFAULT 0,
+          
+          -- AMR 상태 정보 필드들
+          robot_model TEXT,
+          hw_version TEXT,
+          sw_version TEXT,
+          driving_status INTEGER DEFAULT 0,
+          driving_mode INTEGER DEFAULT 0,
+          position_theta REAL DEFAULT 0,
+          velocity_x REAL DEFAULT 0,
+          velocity_y REAL DEFAULT 0,
+          velocity_theta REAL DEFAULT 0,
+          connection_status BOOLEAN DEFAULT true,
+          order_status INTEGER DEFAULT 0,
+          path_status TEXT,
+          battery_soc REAL DEFAULT 0,
+          battery_voltage REAL DEFAULT 0,
+          battery_soh INTEGER DEFAULT 100,
+          charging_status BOOLEAN DEFAULT false,
+          error_code INTEGER DEFAULT 0,
+          error_msg TEXT,
+          amr_timestamp TEXT,
+          
+          last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+          last_status_check DATETIME DEFAULT CURRENT_TIMESTAMP
         )
       `, (err) => {
         if (err) {
@@ -26,6 +50,39 @@ const initializeDatabase = () => {
           return;
         }
         console.log('로봇 테이블 확인 완료');
+      });
+
+      // 기존 robots 테이블에 새 컬럼들 추가 (이미 테이블이 존재하는 경우)
+      const newColumns = [
+        'ALTER TABLE robots ADD COLUMN robot_model TEXT',
+        'ALTER TABLE robots ADD COLUMN hw_version TEXT', 
+        'ALTER TABLE robots ADD COLUMN sw_version TEXT',
+        'ALTER TABLE robots ADD COLUMN driving_status INTEGER DEFAULT 0',
+        'ALTER TABLE robots ADD COLUMN driving_mode INTEGER DEFAULT 0',
+        'ALTER TABLE robots ADD COLUMN position_theta REAL DEFAULT 0',
+        'ALTER TABLE robots ADD COLUMN velocity_x REAL DEFAULT 0',
+        'ALTER TABLE robots ADD COLUMN velocity_y REAL DEFAULT 0', 
+        'ALTER TABLE robots ADD COLUMN velocity_theta REAL DEFAULT 0',
+        'ALTER TABLE robots ADD COLUMN connection_status BOOLEAN DEFAULT true',
+        'ALTER TABLE robots ADD COLUMN order_status INTEGER DEFAULT 0',
+        'ALTER TABLE robots ADD COLUMN path_status TEXT',
+        'ALTER TABLE robots ADD COLUMN battery_soc REAL DEFAULT 0',
+        'ALTER TABLE robots ADD COLUMN battery_voltage REAL DEFAULT 0',
+        'ALTER TABLE robots ADD COLUMN battery_soh INTEGER DEFAULT 100',
+        'ALTER TABLE robots ADD COLUMN charging_status BOOLEAN DEFAULT false',
+        'ALTER TABLE robots ADD COLUMN error_code INTEGER DEFAULT 0',
+        'ALTER TABLE robots ADD COLUMN error_msg TEXT',
+        'ALTER TABLE robots ADD COLUMN amr_timestamp TEXT',
+        'ALTER TABLE robots ADD COLUMN last_status_check DATETIME DEFAULT CURRENT_TIMESTAMP'
+      ];
+
+      // 각 컬럼을 순차적으로 추가 (이미 존재하면 에러 무시)
+      newColumns.forEach(sql => {
+        db.run(sql, (err) => {
+          if (err && !err.message.includes('duplicate column name')) {
+            console.error('컬럼 추가 에러:', err.message);
+          }
+        });
       });
 
       // 맵 정보 테이블

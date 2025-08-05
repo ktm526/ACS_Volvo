@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { getRobotStatusIcon, getRobotStatusColor } from '../../utils/mainPageUtils';
 import { getStatusColor } from '../../constants';
 
-const RobotCard = ({ robot, isSelected, onSelect, onDoubleClick, isMobile = false }) => {
-  const isActiveSelection = isSelected === robot.id;
+const RobotCard = ({ robot, isTracked, onShowDetail, onTrackToggle, isMobile = false }) => {
+  const isActiveSelection = isTracked; // 추적 상태를 기준으로 강조
   const [isHovered, setIsHovered] = useState(false);
   
   // 안전한 기본값 설정
@@ -65,17 +65,23 @@ const RobotCard = ({ robot, isSelected, onSelect, onDoubleClick, isMobile = fals
     }
   };
   
+  const handleInfoAreaClick = (e) => {
+    // 정보 영역 클릭 시 상세 모달 표시
+    if (onShowDetail) {
+      onShowDetail(robot);
+    }
+  };
+
+  const handleTrackToggle = (e) => {
+    e.stopPropagation();
+    if (onTrackToggle) {
+      onTrackToggle(isTracked ? null : robot.id);
+    }
+  };
+
   return (
     <div
-      onClick={() => {
-        onSelect(robot.id);
-        if (onDoubleClick) {
-          onDoubleClick(robot);
-        }
-      }}
       style={getCardStyle()}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
       {/* 선택 표시 */}
       {isActiveSelection && (
@@ -105,6 +111,8 @@ const RobotCard = ({ robot, isSelected, onSelect, onDoubleClick, isMobile = fals
           willChange: 'opacity'
         }} />
       )}
+
+
 
       {/* 로봇 헤더 */}
       <div style={{
@@ -159,41 +167,114 @@ const RobotCard = ({ robot, isSelected, onSelect, onDoubleClick, isMobile = fals
             }}>
               ID: {robot?.id || 'N/A'}
             </div>
+            {robot?.angle !== undefined && (
+              <div style={{
+                fontSize: '10px',
+                color: 'var(--text-tertiary)',
+                marginTop: '1px'
+              }}>
+                방향: {((robot.angle * 180 / Math.PI) % 360).toFixed(0)}°
+              </div>
+            )}
           </div>
         </div>
         
         <div style={{
-          padding: isMobile ? '6px 10px' : '8px 12px',
-          background: `linear-gradient(135deg, ${statusColor}20, ${statusColor}10)`,
-          borderRadius: '8px',
-          fontSize: '11px',
-          fontWeight: '700',
-          color: statusColor,
-          textTransform: 'uppercase',
-          letterSpacing: '0.5px',
-          border: `1px solid ${statusColor}40`,
-          boxShadow: `
-            0 0 10px ${statusColor}30,
-            inset 0 0 5px rgba(255, 255, 255, 0.1)
-          `,
-          textShadow: `0 0 5px ${statusColor}40`
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--space-xs)'
         }}>
-          {status}
+          {/* 추적 버튼 */}
+          <button
+            className="track-button"
+            onClick={handleTrackToggle}
+            style={{
+              width: isMobile ? '32px' : '36px',
+              height: isMobile ? '32px' : '36px',
+              borderRadius: '50%',
+              border: 'none',
+              background: 'transparent',
+              color: isTracked ? statusColor : 'var(--text-secondary)',
+              fontSize: isMobile ? '14px' : '16px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textShadow: isTracked ? 
+                `0 0 10px ${statusColor}80` : 
+                'none',
+              position: 'relative',
+              zIndex: 10
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.color = isTracked ? statusColor : 'var(--primary-color)';
+              e.target.style.textShadow = `0 0 15px ${isTracked ? statusColor : 'var(--primary-color)'}`;
+              e.target.style.transform = 'scale(1.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.color = isTracked ? statusColor : 'var(--text-secondary)';
+              e.target.style.textShadow = isTracked ? `0 0 10px ${statusColor}80` : 'none';
+              e.target.style.transform = 'scale(1)';
+            }}
+            title={isTracked ? '추적 해제' : '추적 시작'}
+          >
+            <i className="fas fa-crosshairs"></i>
+          </button>
+
+          {/* 상태 표시 */}
+          <div style={{
+            padding: isMobile ? '6px 10px' : '8px 12px',
+            background: `linear-gradient(135deg, ${statusColor}20, ${statusColor}10)`,
+            borderRadius: '8px',
+            fontSize: '11px',
+            fontWeight: '700',
+            color: statusColor,
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            border: `1px solid ${statusColor}40`,
+            boxShadow: `
+              0 0 10px ${statusColor}30,
+              inset 0 0 5px rgba(255, 255, 255, 0.1)
+            `,
+            textShadow: `0 0 5px ${statusColor}40`
+          }}>
+            {status}
+          </div>
         </div>
       </div>
 
-      {/* 로봇 정보 */}
+      {/* 디바이더 */}
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
-        gridTemplateRows: 'repeat(2, 1fr)',
-        gap: isMobile ? 'var(--space-xs)' : 'var(--space-sm)',
-        rowGap: isMobile ? 'var(--space-sm)' : 'var(--space-md)',
-        fontSize: '12px',
-        color: 'var(--text-secondary)',
+        height: '1px',
+        background: 'linear-gradient(90deg, transparent, var(--border-primary), transparent)',
+        margin: 'var(--space-sm) 0',
         position: 'relative',
         zIndex: 1
-      }}>
+      }} />
+
+      {/* 로봇 정보 영역 (클릭 가능) */}
+      <div 
+        onClick={handleInfoAreaClick}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
+          gridTemplateRows: 'repeat(2, 1fr)',
+          gap: isMobile ? 'var(--space-xs)' : 'var(--space-sm)',
+          rowGap: isMobile ? 'var(--space-sm)' : 'var(--space-md)',
+          fontSize: '12px',
+          color: 'var(--text-secondary)',
+          position: 'relative',
+          zIndex: 1,
+          cursor: 'pointer',
+          padding: 'var(--space-sm)',
+          margin: 'calc(-1 * var(--space-sm))',
+          borderRadius: 'var(--radius-md)',
+          transition: 'all 0.3s ease'
+        }}
+      >
         {/* 위치 */}
         <div style={{
           display: 'flex',
@@ -338,6 +419,43 @@ const RobotCard = ({ robot, isSelected, onSelect, onDoubleClick, isMobile = fals
             </div>
           </div>
         </div>
+
+        {/* 호버 시 반투명 오버레이 */}
+        {isHovered && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(4px)',
+            borderRadius: 'var(--radius-md)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 15,
+            transition: 'all 0.3s ease'
+          }}>
+            <div style={{
+              background: 'rgba(0, 0, 0, 0.8)',
+              color: 'white',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              fontSize: isMobile ? '11px' : '12px',
+              fontWeight: '600',
+              whiteSpace: 'nowrap',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              textShadow: '0 1px 2px rgba(0, 0, 0, 0.8)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <i className="fas fa-mouse-pointer" style={{ fontSize: '12px', opacity: 0.8 }}></i>
+              클릭하여 상세 정보 조회
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 현재 작업 표시 (있는 경우) */}

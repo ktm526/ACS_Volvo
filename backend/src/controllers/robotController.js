@@ -1,4 +1,5 @@
 const Robot = require('../models/Robot');
+const robotStatusService = require('../services/robotStatusService');
 
 const robotController = {
   // 모든 로봇 조회
@@ -123,6 +124,248 @@ const robotController = {
     } catch (error) {
       console.error('로봇 삭제 에러:', error);
       res.status(500).json({ error: '로봇 삭제 중 오류가 발생했습니다.' });
+    }
+  },
+
+  // === 상태 수집 관련 메서드들 ===
+
+  // 로봇 상태 수집 서비스 상태 조회
+  async getServiceStatus(req, res) {
+    try {
+      const status = robotStatusService.getStatus();
+      res.json({
+        success: true,
+        data: status
+      });
+    } catch (error) {
+      console.error('서비스 상태 조회 실패:', error);
+      res.status(500).json({
+        success: false,
+        error: '서비스 상태 조회에 실패했습니다.',
+        details: error.message
+      });
+    }
+  },
+
+  // 상태 수집 서비스 시작
+  async startService(req, res) {
+    try {
+      robotStatusService.start();
+      res.json({
+        success: true,
+        message: '로봇 상태 수집 서비스가 시작되었습니다.'
+      });
+    } catch (error) {
+      console.error('서비스 시작 실패:', error);
+      res.status(500).json({
+        success: false,
+        error: '서비스 시작에 실패했습니다.',
+        details: error.message
+      });
+    }
+  },
+
+  // 상태 수집 서비스 중지
+  async stopService(req, res) {
+    try {
+      robotStatusService.stop();
+      res.json({
+        success: true,
+        message: '로봇 상태 수집 서비스가 중지되었습니다.'
+      });
+    } catch (error) {
+      console.error('서비스 중지 실패:', error);
+      res.status(500).json({
+        success: false,
+        error: '서비스 중지에 실패했습니다.',
+        details: error.message
+      });
+    }
+  },
+
+  // 서비스 설정 변경
+  async updateServiceSettings(req, res) {
+    try {
+      const { pollInterval, httpTimeout } = req.body;
+
+      if (pollInterval && pollInterval >= 1000) {
+        robotStatusService.setPollInterval(pollInterval);
+      }
+
+      if (httpTimeout && httpTimeout >= 1000) {
+        robotStatusService.setHttpTimeout(httpTimeout);
+      }
+
+      res.json({
+        success: true,
+        message: '서비스 설정이 업데이트되었습니다.',
+        data: robotStatusService.getStatus()
+      });
+    } catch (error) {
+      console.error('서비스 설정 업데이트 실패:', error);
+      res.status(500).json({
+        success: false,
+        error: '서비스 설정 업데이트에 실패했습니다.',
+        details: error.message
+      });
+    }
+  },
+
+  // 수동 상태 수집 실행 (모든 로봇)
+  async collectAllStatus(req, res) {
+    try {
+      await robotStatusService.collectAllRobotStatus();
+      res.json({
+        success: true,
+        message: '모든 로봇의 상태 수집이 실행되었습니다.'
+      });
+    } catch (error) {
+      console.error('전체 상태 수집 실패:', error);
+      res.status(500).json({
+        success: false,
+        error: '상태 수집 실행에 실패했습니다.',
+        details: error.message
+      });
+    }
+  },
+
+  // 특정 로봇 상태 수집
+  async collectRobotStatus(req, res) {
+    try {
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ 
+          success: false,
+          error: '유효하지 않은 로봇 ID입니다.' 
+        });
+      }
+
+      await robotStatusService.collectSingleRobotStatus(id);
+      res.json({
+        success: true,
+        message: `로봇 ID ${id}의 상태 수집이 실행되었습니다.`
+      });
+    } catch (error) {
+      console.error('개별 로봇 상태 수집 실패:', error);
+      res.status(500).json({
+        success: false,
+        error: '로봇 상태 수집에 실패했습니다.',
+        details: error.message
+      });
+    }
+  },
+
+  // 로봇 상태 통계 조회
+  async getStatusStats(req, res) {
+    try {
+      const stats = await robotStatusService.getRobotStatusStats();
+      res.json({
+        success: true,
+        data: stats
+      });
+    } catch (error) {
+      console.error('상태 통계 조회 실패:', error);
+      res.status(500).json({
+        success: false,
+        error: '상태 통계 조회에 실패했습니다.',
+        details: error.message
+      });
+    }
+  },
+
+  // 연결된 로봇 수 조회
+  async getConnectedCount(req, res) {
+    try {
+      const count = await robotStatusService.getConnectedRobotsCount();
+      res.json({
+        success: true,
+        data: { connectedCount: count }
+      });
+    } catch (error) {
+      console.error('연결된 로봇 수 조회 실패:', error);
+      res.status(500).json({
+        success: false,
+        error: '연결된 로봇 수 조회에 실패했습니다.',
+        details: error.message
+      });
+    }
+  },
+
+  // AMR 이동 요청
+  async requestMove(req, res) {
+    try {
+      const { robotId, nodeId, timestamp } = req.body;
+
+      // 입력값 검증
+      if (!robotId || !nodeId) {
+        return res.status(400).json({
+          success: false,
+          error: '로봇 ID와 노드 ID는 필수입니다.',
+          message: '로봇 ID와 노드 ID를 모두 제공해주세요.'
+        });
+      }
+
+      // 로봇 존재 여부 확인
+      const robot = await Robot.findById(parseInt(robotId));
+      if (!robot) {
+        return res.status(404).json({
+          success: false,
+          error: '로봇을 찾을 수 없습니다.',
+          message: `ID ${robotId}인 로봇이 존재하지 않습니다.`
+        });
+      }
+
+      // 로봇 상태 확인 (이동 가능한 상태인지)
+      if (robot.status === 'error' || robot.status === 'disconnected') {
+        return res.status(400).json({
+          success: false,
+          error: '로봇이 이동 불가능한 상태입니다.',
+          message: `로봇 ${robot.name}은 현재 ${robot.status} 상태로 이동할 수 없습니다.`
+        });
+      }
+
+      console.log(`AMR 이동 요청 수신:`, {
+        robotId,
+        nodeId,
+        robotName: robot.name,
+        robotStatus: robot.status,
+        timestamp: timestamp || new Date().toISOString()
+      });
+
+      // 실제 로봇 제어 로직은 여기에 구현
+      // 현재는 시뮬레이션으로 로봇 상태를 moving으로 변경
+      await robot.update({
+        status: 'moving',
+        currentMission: `노드 ${nodeId}로 이동 중`,
+        destination_node_id: nodeId
+      });
+
+      // 성공 응답
+      res.json({
+        success: true,
+        message: 'AMR 이동 요청이 성공적으로 처리되었습니다.',
+        data: {
+          robotId: robot.id,
+          robotName: robot.name,
+          nodeId,
+          previousStatus: robot.status,
+          newStatus: 'moving',
+          timestamp: timestamp || new Date().toISOString()
+        }
+      });
+
+      // 로그 출력
+      console.log(`✅ AMR 이동 요청 완료: 로봇 ${robot.name} (ID: ${robot.id}) -> 노드 ${nodeId}`);
+
+    } catch (error) {
+      console.error('AMR 이동 요청 실패:', error);
+      res.status(500).json({
+        success: false,
+        error: 'AMR 이동 요청 처리 중 오류가 발생했습니다.',
+        message: error.message,
+        details: error.stack
+      });
     }
   }
 };

@@ -71,6 +71,31 @@ export const robotsAPI = {
     } catch (error) {
       throw new Error('로봇 위치 업데이트에 실패했습니다.');
     }
+  },
+
+  // 로봇 방향 업데이트
+  updateAngle: async (id, angle) => {
+    try {
+      const response = await api.patch(`${API_ENDPOINTS.ROBOTS}/${id}/location`, { angle });
+      return response.data;
+    } catch (error) {
+      throw new Error('로봇 방향 업데이트에 실패했습니다.');
+    }
+  },
+
+  // AMR 이동 요청
+  requestMove: async (robotId, nodeId) => {
+    try {
+      const response = await api.post(API_ENDPOINTS.MOVE_REQUEST, {
+        robotId,
+        nodeId,
+        timestamp: new Date().toISOString()
+      });
+      return response.data;
+    } catch (error) {
+      console.error('AMR 이동 요청 API 에러:', error);
+      throw new Error(error.response?.data?.message || 'AMR 이동 요청에 실패했습니다.');
+    }
   }
 };
 

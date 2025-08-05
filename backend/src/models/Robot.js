@@ -9,7 +9,31 @@ class Robot {
     this.battery = data.battery || 100;
     this.location_x = data.location_x || 0;
     this.location_y = data.location_y || 0;
+    this.angle = data.angle || 0;
+    
+    // AMR 상태 정보 필드들
+    this.robot_model = data.robot_model;
+    this.hw_version = data.hw_version;
+    this.sw_version = data.sw_version;
+    this.driving_status = data.driving_status || 0;
+    this.driving_mode = data.driving_mode || 0;
+    this.position_theta = data.position_theta || 0;
+    this.velocity_x = data.velocity_x || 0;
+    this.velocity_y = data.velocity_y || 0;
+    this.velocity_theta = data.velocity_theta || 0;
+    this.connection_status = data.connection_status !== undefined ? data.connection_status : true;
+    this.order_status = data.order_status || 0;
+    this.path_status = data.path_status;
+    this.battery_soc = data.battery_soc || 0;
+    this.battery_voltage = data.battery_voltage || 0;
+    this.battery_soh = data.battery_soh || 100;
+    this.charging_status = data.charging_status || false;
+    this.error_code = data.error_code || 0;
+    this.error_msg = data.error_msg;
+    this.amr_timestamp = data.amr_timestamp;
+    
     this.last_updated = data.last_updated;
+    this.last_status_check = data.last_status_check;
   }
 
   static findAll() {
@@ -41,11 +65,13 @@ class Robot {
   static create(data) {
     const db = getDatabase();
     return new Promise((resolve, reject) => {
-      const { name, ip_address, status = 'idle', battery = 100, location_x = 0, location_y = 0 } = data;
+      const { name, ip_address, status = 'idle', battery = 100, location_x = 0, location_y = 0, angle = 0 } = data;
+      const currentTime = new Date().toISOString();
       
       db.run(
-        'INSERT INTO robots (name, ip_address, status, battery, location_x, location_y, last_updated) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
-        [name, ip_address, status, battery, location_x, location_y],
+        `INSERT INTO robots (name, ip_address, status, battery, location_x, location_y, angle, connection_status, last_updated, last_status_check) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [name, ip_address, status, battery, location_x, location_y, angle, true, currentTime, currentTime],
         function(err) {
           if (err) {
             reject(err);
@@ -94,6 +120,93 @@ class Robot {
     });
   }
 
+  // AMR 상태 정보 업데이트 (상태 수집 시 사용)
+  updateAmrStatus(statusData) {
+    const db = getDatabase();
+    return new Promise((resolve, reject) => {
+      const amrStatusData = {
+        robot_model: statusData.robot_model || null,
+        hw_version: statusData.hw_version || null,
+        sw_version: statusData.sw_version || null,
+        driving_status: statusData.driving_status || 0,
+        driving_mode: statusData.driving_mode || 0,
+        position_theta: statusData.position_theta || 0,
+        velocity_x: statusData.velocity_x || 0,
+        velocity_y: statusData.velocity_y || 0,
+        velocity_theta: statusData.velocity_theta || 0,
+        connection_status: statusData.connection_status !== undefined ? statusData.connection_status : true,
+        order_status: statusData.order_status || 0,
+        path_status: Array.isArray(statusData.path_status) ? JSON.stringify(statusData.path_status) : statusData.path_status,
+        battery_soc: statusData.battery_soc || 0,
+        battery_voltage: statusData.battery_voltage || 0,
+        battery_soh: statusData.battery_soh || 100,
+        charging_status: statusData.charging_status || false,
+        error_code: statusData.error_code || 0,
+        error_msg: statusData.error_msg || null,
+        amr_timestamp: statusData.timestamp || null,
+        last_status_check: new Date().toISOString()
+      };
+
+      // 기본 로봇 정보도 함께 업데이트
+      if (statusData.battery_soc !== undefined) {
+        amrStatusData.battery = Math.round(statusData.battery_soc);
+      }
+
+      if (statusData.position_x !== undefined) {
+        amrStatusData.location_x = statusData.position_x;
+      }
+      if (statusData.position_y !== undefined) {
+        amrStatusData.location_y = statusData.position_y;
+      }
+      if (statusData.position_theta !== undefined) {
+        amrStatusData.angle = statusData.position_theta;
+      }
+
+      // 상태 정보 업데이트 (driving_status를 기반으로 상태 매핑)
+      if (statusData.driving_status !== undefined) {
+        switch (statusData.driving_status) {
+          case 0:
+            amrStatusData.status = 'idle';
+            break;
+          case 1:
+            amrStatusData.status = 'moving';
+            break;
+          default:
+            amrStatusData.status = 'idle';
+        }
+      }
+
+      // 충전 상태 확인
+      if (statusData.charging_status === true) {
+        amrStatusData.status = 'charging';
+      }
+
+      // 에러 상태 확인
+      if (statusData.error_code && statusData.error_code !== 0) {
+        amrStatusData.status = 'error';
+      }
+
+      // 연결 실패한 경우 상태 업데이트
+      if (statusData.connection_status === false) {
+        amrStatusData.status = 'disconnected';
+        amrStatusData.connection_status = false;
+      }
+
+      this.update(amrStatusData)
+        .then(resolve)
+        .catch(reject);
+    });
+  }
+
+  // 연결 실패 상태로 업데이트
+  markAsDisconnected(errorMessage) {
+    return this.updateAmrStatus({
+      connection_status: false,
+      error_code: -1,
+      error_msg: errorMessage || '연결 실패'
+    });
+  }
+
   delete() {
     const db = getDatabase();
     return new Promise((resolve, reject) => {
@@ -134,9 +247,9 @@ class Robot {
     }
     
     if (data.status) {
-      const validStatuses = ['idle', 'moving', 'charging', 'error'];
+      const validStatuses = ['idle', 'moving', 'charging', 'error', 'disconnected'];
       if (!validStatuses.includes(data.status)) {
-        errors.push('유효하지 않은 상태입니다. (idle, moving, charging, error)');
+        errors.push('유효하지 않은 상태입니다. (idle, moving, charging, error, disconnected)');
       }
     }
     
@@ -152,6 +265,12 @@ class Robot {
     
     if (data.location_y !== undefined && typeof data.location_y !== 'number') {
       errors.push('Y 좌표는 숫자여야 합니다.');
+    }
+    
+    if (data.angle !== undefined) {
+      if (typeof data.angle !== 'number' || data.angle < -Math.PI || data.angle > Math.PI) {
+        errors.push('각도는 -π ~ π 라디안 범위의 숫자여야 합니다.');
+      }
     }
     
     return errors;

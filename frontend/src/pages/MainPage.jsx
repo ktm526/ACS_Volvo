@@ -6,6 +6,7 @@ import MapControls from '../components/main/MapControls';
 import RobotDetailModal from '../components/main/RobotDetailModal';
 import { useAppContext } from '../contexts/AppContext.jsx';
 import { calculateStats } from '../utils/mainPageUtils';
+import { robotsAPI } from '../services/api';
 
 const MainPage = () => {
   const { state, actions } = useAppContext();
@@ -18,7 +19,6 @@ const MainPage = () => {
     missions: true
   });
 
-  const [selectedRobot, setSelectedRobot] = useState(null);
   const [liveDataEnabled, setLiveDataEnabled] = useState(true);
   const [sidebarTab, setSidebarTab] = useState('robots');
   
@@ -88,7 +88,7 @@ const MainPage = () => {
   const [showRobotDetail, setShowRobotDetail] = useState(false);
   const [selectedRobotDetail, setSelectedRobotDetail] = useState(null);
   
-  // 로봇 상세정보 모달 핸들러
+  // 로봇 상세정보 모달 핸들러 도ㅇ해물과 배산ㅣ 마고 닳ㅗㅗㄱ 하님ㅣ 모
   const handleShowRobotDetail = (robot) => {
     setSelectedRobotDetail(robot);
     setShowRobotDetail(true);
@@ -280,9 +280,6 @@ const MainPage = () => {
   const handleRobotTrack = (robotId) => {
     console.log('Robot track change:', trackedRobot, '->', robotId);
     setTrackedRobot(robotId);
-    if (robotId) {
-      setSelectedRobot(robotId);
-    }
   };
 
   // 3D 씬에서 카메라 상태 변경을 받는 핸들러
@@ -407,6 +404,41 @@ const MainPage = () => {
     }
   };
 
+  // AMR 이동 요청 핸들러
+  const handleMoveRequest = async (robotId, nodeId) => {
+    try {
+      console.log('AMR 이동 요청:', { robotId, nodeId });
+      
+      // API 호출
+      const result = await robotsAPI.requestMove(robotId, nodeId);
+      console.log('AMR 이동 요청 성공:', result);
+      
+      // 알림 표시
+      if (actions.addNotification) {
+        actions.addNotification({
+          type: 'success',
+          message: `AMR 이동 요청이 완료되었습니다. (로봇 ID: ${robotId}, 노드 ID: ${nodeId})`
+        });
+      }
+      
+      // 로봇 데이터 새로고침 (이동 상태 반영)
+      setTimeout(() => {
+        loadRobots();
+      }, 1000);
+      
+    } catch (error) {
+      console.error('AMR 이동 요청 실패:', error);
+      
+      // 에러 알림 표시
+      if (actions.addNotification) {
+        actions.addNotification({
+          type: 'error',
+          message: error.message || 'AMR 이동 요청에 실패했습니다.'
+        });
+      }
+    }
+  };
+
   return (
     <div style={{
       width: '100%',
@@ -487,9 +519,9 @@ const MainPage = () => {
             setSidebarTab={setSidebarTab}
             robots={activeRobots}
             missions={activeMissions}
-            selectedRobot={selectedRobot}
-            setSelectedRobot={setSelectedRobot}
+            trackedRobot={trackedRobot}
             onShowRobotDetail={handleShowRobotDetail}
+            onTrackToggle={handleRobotTrack}
             isLoading={isLoading}
             isMobile={isMobile}
             onClose={() => setSidebarOpen(false)}
@@ -636,7 +668,6 @@ const MainPage = () => {
                 robots={activeRobots}
                 missions={activeMissions}
                 viewMode={viewMode}
-                selectedRobot={selectedRobot}
                 showPaths={true}
                 showStations={true}
                 showGrid={true}
@@ -647,6 +678,7 @@ const MainPage = () => {
                 showMapData={!!currentMapData}
                 initialCameraState={cameraState}
                 onCameraStateChange={handleCameraStateChange}
+                onMoveRequest={handleMoveRequest}
               />
               <MainViewOverlay stats={stats} />
               <MapControls

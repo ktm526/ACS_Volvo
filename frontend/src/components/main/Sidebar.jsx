@@ -8,9 +8,9 @@ const Sidebar = ({
   setSidebarTab, 
   robots, 
   missions, 
-  selectedRobot, 
-  setSelectedRobot,
+  trackedRobot,
   onShowRobotDetail,
+  onTrackToggle,
   isLoading = false,
   isMobile = false,
   onClose
@@ -426,9 +426,9 @@ const Sidebar = ({
                 <RobotCard
                   key={robot.id}
                   robot={robot}
-                  isSelected={selectedRobot}
-                  onSelect={setSelectedRobot}
-                  onDoubleClick={onShowRobotDetail}
+                  isTracked={trackedRobot === robot.id}
+                  onShowDetail={onShowRobotDetail}
+                  onTrackToggle={onTrackToggle}
                   isMobile={isMobile}
                 />
               ))
