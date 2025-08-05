@@ -1,5 +1,6 @@
 const Robot = require('../models/Robot');
 const robotStatusService = require('../services/robotStatusService');
+const axios = require('axios');
 
 const robotController = {
   // 모든 로봇 조회
@@ -318,6 +319,15 @@ const robotController = {
         });
       }
 
+      // 로봇 IP 주소 확인
+      if (!robot.ip_address) {
+        return res.status(400).json({
+          success: false,
+          error: '로봇 IP 주소가 설정되지 않았습니다.',
+          message: `로봇 ${robot.name}의 IP 주소가 설정되지 않았습니다.`
+        });
+      }
+
       // 로봇 상태 확인 (이동 가능한 상태인지)
       if (robot.status === 'error' || robot.status === 'disconnected') {
         return res.status(400).json({
@@ -327,38 +337,87 @@ const robotController = {
         });
       }
 
-      console.log(`AMR 이동 요청 수신:`, {
+      console.log(`🚀 AMR 이동 요청 수신:`, {
         robotId,
         nodeId,
         robotName: robot.name,
+        robotIP: robot.ip_address,
+        robotPort: robot.port || 80,
         robotStatus: robot.status,
         timestamp: timestamp || new Date().toISOString()
       });
 
-      // 실제 로봇 제어 로직은 여기에 구현
-      // 현재는 시뮬레이션으로 로봇 상태를 moving으로 변경
-      await robot.update({
-        status: 'moving',
-        currentMission: `노드 ${nodeId}로 이동 중`,
-        destination_node_id: nodeId
-      });
+      // 실제 로봇에 이동 명령 전송
+      try {
+        const port = robot.port || 80;
+        const robotCommandUrl = `http://${robot.ip_address}:${port}/api/v1/amr/command`;
+        
+        const commandPayload = {
+          action: "execute",
+          type: "navigate",
+          params: {
+            goto_node_id: nodeId
+          }
+        };
 
-      // 성공 응답
-      res.json({
-        success: true,
-        message: 'AMR 이동 요청이 성공적으로 처리되었습니다.',
-        data: {
-          robotId: robot.id,
-          robotName: robot.name,
-          nodeId,
-          previousStatus: robot.status,
-          newStatus: 'moving',
-          timestamp: timestamp || new Date().toISOString()
-        }
-      });
+        console.log(`📡 로봇에 명령 전송: ${robotCommandUrl}`, commandPayload);
 
-      // 로그 출력
-      console.log(`✅ AMR 이동 요청 완료: 로봇 ${robot.name} (ID: ${robot.id}) -> 노드 ${nodeId}`);
+        const robotResponse = await axios.post(robotCommandUrl, commandPayload, {
+          timeout: 10000, // 10초 타임아웃
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        });
+
+        console.log(`✅ 로봇 응답 성공:`, {
+          status: robotResponse.status,
+          data: robotResponse.data
+        });
+
+        // 로봇 응답이 성공적이면 데이터베이스 상태 업데이트
+        await robot.update({
+          status: 'moving',
+          currentMission: `노드 ${nodeId}로 이동 중`,
+          destination_node_id: nodeId,
+          last_command_sent: new Date().toISOString()
+        });
+
+        // 성공 응답
+        res.json({
+          success: true,
+          message: 'AMR 이동 요청이 성공적으로 처리되었습니다.',
+          data: {
+            robotId: robot.id,
+            robotName: robot.name,
+            nodeId,
+            previousStatus: robot.status,
+            newStatus: 'moving',
+            timestamp: timestamp || new Date().toISOString(),
+            robotResponse: robotResponse.data
+          }
+        });
+
+        console.log(`🎯 AMR 이동 요청 완료: 로봇 ${robot.name} (ID: ${robot.id}) -> 노드 ${nodeId}`);
+
+      } catch (robotError) {
+        // 로봇 통신 실패
+        console.error(`❌ 로봇 통신 실패 (${robot.ip_address}:${robot.port || 80}):`, robotError.message);
+
+        // 로봇을 disconnected 상태로 마킹
+        await robot.markAsDisconnected(`이동 명령 전송 실패: ${robotError.message}`);
+
+        return res.status(503).json({
+          success: false,
+          error: '로봇과 통신할 수 없습니다.',
+          message: `로봇 ${robot.name}에 이동 명령을 전송하는데 실패했습니다: ${robotError.message}`,
+          details: {
+            robotIP: robot.ip_address,
+            robotPort: robot.port || 80,
+            errorType: robotError.code || 'UNKNOWN_ERROR'
+          }
+        });
+      }
 
     } catch (error) {
       console.error('AMR 이동 요청 실패:', error);

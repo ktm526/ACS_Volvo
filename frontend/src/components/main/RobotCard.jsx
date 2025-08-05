@@ -7,11 +7,35 @@ const RobotCard = ({ robot, isTracked, onShowDetail, onTrackToggle, isMobile = f
   const [isHovered, setIsHovered] = useState(false);
   
   // 안전한 기본값 설정
-  const position = robot?.position || { x: 0, y: 0 };
+  const position = {
+    x: robot?.location_x !== undefined ? robot.location_x : 0,
+    y: robot?.location_y !== undefined ? robot.location_y : 0
+  };
   const battery = robot?.battery || 0;
   const status = robot?.status || 'unknown';
   const name = robot?.name || robot?.id || 'Unknown Robot';
   const currentTask = robot?.currentTask || null;
+
+  // 디버깅: RobotCard 위치 데이터 확인
+  if (position.x !== 0 || position.y !== 0) {
+    console.log('✅ RobotCard - 위치 데이터 매핑 성공:', {
+      robot_id: robot?.id,
+      robot_name: name,
+      원본_location_x: robot?.location_x,
+      원본_location_y: robot?.location_y,
+      매핑된_position: position
+    });
+  } else {
+    console.log('❌ RobotCard - 위치 데이터가 0,0입니다:', {
+      robot_id: robot?.id,
+      robot_name: name,
+      원본_location_x: robot?.location_x,
+      원본_location_y: robot?.location_y,
+      타입_location_x: typeof robot?.location_x,
+      타입_location_y: typeof robot?.location_y,
+      전체_로봇_데이터: robot
+    });
+  }
   
   const statusColor = getStatusColor(status, 'robot');
   

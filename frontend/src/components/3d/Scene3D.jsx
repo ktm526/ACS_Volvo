@@ -244,7 +244,8 @@ function Robot({ robot, colors, isSelected = false, onHover, onHoverEnd, theme }
   const calculateDirection = () => {
     // 먼저 angle 필드 확인
     if (robot.angle !== undefined && robot.angle !== null) {
-      return robot.angle;
+      // 좌표계 보정: ROS 좌표계에서 Three.js 좌표계로 변환
+      return robot.angle + Math.PI / 2;
     }
     
     // angle이 없으면 경로 정보를 이용
@@ -259,16 +260,36 @@ function Robot({ robot, colors, isSelected = false, onHover, onHoverEnd, theme }
         if (currentPoint && nextPoint && Array.isArray(currentPoint) && Array.isArray(nextPoint)) {
           const dx = nextPoint[0] - currentPoint[0];
           const dy = nextPoint[1] - currentPoint[1];
-          return Math.atan2(dy, dx);
+          // 경로 기반 방향도 좌표계 보정
+          return Math.atan2(dy, dx) + Math.PI / 2;
         }
       }
     }
     
-    // 기본 방향 (북쪽)
-    return 0;
+    // 기본 방향 (북쪽, 좌표계 보정 적용)
+    return Math.PI / 2;
   };
 
   const robotDirection = calculateDirection();
+
+  // 디버깅: 로봇 데이터 확인 (위치가 0,0이 아닌 경우만)
+  if (robot.location_x !== 0 || robot.location_y !== 0) {
+    console.log('✅ Robot 컴포넌트 - 로봇 위치 데이터 확인:', {
+      id: robot.id,
+      name: robot.name,
+      location_x: robot.location_x,
+      location_y: robot.location_y,
+      angle: robot.angle,
+      원본_각도_도수: robot.angle ? (robot.angle * 180 / Math.PI).toFixed(1) + '°' : 'N/A',
+      보정된_방향_도수: (robotDirection * 180 / Math.PI).toFixed(1) + '°'
+    });
+  } else {
+    console.log('❌ Robot 컴포넌트 - 로봇 위치가 0,0입니다:', {
+      id: robot.id,
+      name: robot.name,
+      전체_데이터: robot
+    });
+  }
 
   // 레이더 스캔 효과
   useFrame((state) => {
@@ -332,8 +353,14 @@ function Robot({ robot, colors, isSelected = false, onHover, onHoverEnd, theme }
     setIsHovered(false);
   }, [robot.id]);
   
+  // 안전한 위치 값 사용
+  const robotX = robot.location_x !== undefined ? robot.location_x : 0;
+  const robotY = robot.location_y !== undefined ? robot.location_y : 0;
+  
+  console.log('Robot 컴포넌트 - 최종 위치:', { robotX, robotY });
+
   return (
-    <group position={[robot.location_x, 0.1, robot.location_y]}>
+    <group position={[robotX, 0.1, -robotY]}>
       {/* 펄스 링들 */}
       <group rotation={[-Math.PI / 2, 0, robotDirection]}>
         <mesh 
@@ -404,7 +431,7 @@ function Robot({ robot, colors, isSelected = false, onHover, onHoverEnd, theme }
       {/* 로봇 툴팁 (3D 공간에 고정) */}
       {isHovered && (
         <Html 
-          position={[robot.location_x, 1.2, robot.location_y]}
+          position={[robotX, 1.2, -robotY]}
           center
           style={{
             transform: 'translate(-50%, -100%)',
@@ -452,9 +479,26 @@ function RobotTooltip({ robot, statusColor, theme = 'dark' }) {
   const safeName = robot.name || robot.id || 'Unknown';
   const safeId = robot.id || 'Unknown';
   const safeMission = robot.currentMission || '상태 정보 없음';
-  const safeLocationX = robot.location_x || 0;
-  const safeLocationY = robot.location_y || 0;
+  const safeLocationX = robot.location_x !== undefined ? robot.location_x : 0;
+  const safeLocationY = robot.location_y !== undefined ? robot.location_y : 0;
   const safeSpeed = robot.speed || 0;
+
+  // 디버깅: 툴팁에서 위치 데이터 확인 (호버 시에만)
+  if (safeLocationX !== 0 || safeLocationY !== 0) {
+    console.log('✅ RobotTooltip - 위치 데이터 정상:', {
+      원본_location_x: robot.location_x,
+      원본_location_y: robot.location_y,
+      최종_표시_위치: { x: safeLocationX, y: safeLocationY }
+    });
+  } else {
+    console.log('❌ RobotTooltip - 위치 데이터가 0,0:', {
+      원본_location_x: robot.location_x,
+      원본_location_y: robot.location_y,
+      타입_원본_x: typeof robot.location_x,
+      타입_원본_y: typeof robot.location_y,
+      전체_로봇_데이터: robot
+    });
+  }
 
   return (
     <div style={{

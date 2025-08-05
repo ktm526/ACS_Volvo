@@ -6,7 +6,10 @@ const RobotDetailModal = ({ robot, isOpen, onClose }) => {
   if (!isOpen || !robot) return null;
 
   const statusColor = getStatusColor(robot.status, 'robot');
-  const position = robot.position || { x: 0, y: 0 };
+  const position = {
+    x: robot.location_x !== undefined ? robot.location_x : 0,
+    y: robot.location_y !== undefined ? robot.location_y : 0
+  };
   const battery = robot.battery || 0;
 
   const formatDate = (dateString) => {

@@ -5,7 +5,7 @@ class RobotStatusService {
   constructor() {
     this.intervalId = null;
     this.isRunning = false;
-    this.pollInterval = 10000; // 10초마다 상태 수집 (10Hz)
+    this.pollInterval = 1000; // 1초마다 상태 수집 (1Hz)
     this.httpTimeout = 5000; // HTTP 요청 타임아웃 5초
   }
 
@@ -86,7 +86,7 @@ class RobotStatusService {
 
     try {
       const port = robot.port || 80;
-      const url = `http://${robot.ip_address}:${port}/api/v1/AMR/status`;
+      const url = `http://${robot.ip_address}:${port}/api/v1/amr/status`;
       console.log(`로봇 ${robot.name} (${robot.ip_address}:${port}) 상태 요청 중...`);
 
       const response = await axios.get(url, {

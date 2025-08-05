@@ -124,6 +124,14 @@ const MainPage = () => {
       if (response.ok) {
         const robotsData = data.data || [];
         console.log('설정된 로봇 데이터:', robotsData);
+        console.log('첫 번째 로봇 위치 정보:', robotsData[0] ? {
+          id: robotsData[0].id,
+          name: robotsData[0].name,
+          location_x: robotsData[0].location_x,
+          location_y: robotsData[0].location_y,
+          타입_x: typeof robotsData[0].location_x,
+          타입_y: typeof robotsData[0].location_y
+        } : 'No robots');
         setRobots(robotsData);
         // AppContext에도 업데이트
         actions.setRobots(robotsData);
@@ -312,6 +320,18 @@ const MainPage = () => {
     loadMissions();
     fetchAvailableMaps();
   }, []);
+
+  // 실시간 데이터 업데이트 (3초마다)
+  useEffect(() => {
+    if (!liveDataEnabled) return;
+
+    const interval = setInterval(() => {
+      console.log('🔄 실시간 로봇 데이터 업데이트 중...');
+      loadRobots();
+    }, 3000); // 3초마다 업데이트
+
+    return () => clearInterval(interval);
+  }, [liveDataEnabled]);
 
   // 선택된 맵이 변경될 때 맵 데이터 가져오기
   useEffect(() => {
