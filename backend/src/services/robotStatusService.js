@@ -86,7 +86,7 @@ class RobotStatusService {
 
     try {
       const port = robot.port || 80;
-      const url = `http://${robot.ip_address}:${port}/api/v1/amr/status`;
+      const url = `http://${robot.ip_address}:${port}/api/v1/AMR/status`;
       console.log(`로봇 ${robot.name} (${robot.ip_address}:${port}) 상태 요청 중...`);
 
       const response = await axios.get(url, {

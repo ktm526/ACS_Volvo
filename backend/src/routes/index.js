@@ -4,6 +4,7 @@ const router = express.Router();
 // 라우트 파일들 import
 const robotRoutes = require('./robots');
 const mapRoutes = require('./maps');
+const missionRoutes = require('./missions');
 
 // 기본 라우트
 router.get('/', (req, res) => {
@@ -12,7 +13,8 @@ router.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       robots: '/api/robots',
-      maps: '/api/maps'
+      maps: '/api/maps',
+      missions: '/api/missions'
     }
   });
 });
@@ -20,5 +22,6 @@ router.get('/', (req, res) => {
 // API 라우트 등록
 router.use('/robots', robotRoutes);
 router.use('/maps', mapRoutes);
+router.use('/missions', missionRoutes);
 
 module.exports = router; 

@@ -4,6 +4,7 @@ import Sidebar from '../components/main/Sidebar';
 import MainViewOverlay from '../components/main/MainViewOverlay';
 import MapControls from '../components/main/MapControls';
 import RobotDetailModal from '../components/main/RobotDetailModal';
+import TaskAddModal from '../components/main/TaskAddModal';
 import { useAppContext } from '../contexts/AppContext.jsx';
 import { calculateStats } from '../utils/mainPageUtils';
 import { robotsAPI } from '../services/api';
@@ -88,6 +89,9 @@ const MainPage = () => {
   const [showRobotDetail, setShowRobotDetail] = useState(false);
   const [selectedRobotDetail, setSelectedRobotDetail] = useState(null);
   
+  // 태스크 추가 모달 상태
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  
   // 로봇 상세정보 모달 핸들러 도ㅇ해물과 배산ㅣ 마고 닳ㅗㅗㄱ 하님ㅣ 모
   const handleShowRobotDetail = (robot) => {
     setSelectedRobotDetail(robot);
@@ -153,13 +157,26 @@ const MainPage = () => {
     }
   };
 
-  // 미션 목록 로드 (현재 백엔드에 미션 API 없음)
+  // 미션 목록 로드
   const loadMissions = async () => {
     try {
       setLoading(prev => ({ ...prev, missions: true }));
-      // 미션 API가 구현되지 않았으므로 빈 배열로 설정
-      console.log('미션 API가 아직 구현되지 않음');
-      setMissions([]);
+      console.log('미션 데이터 로딩 시작:', `${API_URL}/api/missions`);
+      
+      const response = await fetch(`${API_URL}/api/missions`);
+      console.log('미션 API 응답 상태:', response.status);
+      
+      const data = await response.json();
+      console.log('미션 API 응답 데이터:', data);
+      
+      if (response.ok) {
+        const missionsData = data.data || [];
+        console.log('설정된 미션 데이터:', missionsData);
+        setMissions(missionsData);
+      } else {
+        console.error('미션 API 에러:', data);
+        setMissions([]);
+      }
     } catch (error) {
       console.error('미션 목록 가져오기 실패:', error);
       setMissions([]);
@@ -545,6 +562,7 @@ const MainPage = () => {
             isLoading={isLoading}
             isMobile={isMobile}
             onClose={() => setSidebarOpen(false)}
+            onOpenTaskModal={() => setShowTaskModal(true)}
           />
         </div>
 
@@ -724,6 +742,19 @@ const MainPage = () => {
         robot={selectedRobotDetail}
         isOpen={showRobotDetail}
         onClose={handleCloseRobotDetail}
+      />
+
+      {/* 태스크 추가 모달 */}
+      <TaskAddModal
+        isOpen={showTaskModal}
+        onClose={() => setShowTaskModal(false)}
+        onTaskCreated={() => {
+          // 미션 목록 새로고침
+          loadMissions();
+          setShowTaskModal(false);
+        }}
+        robots={activeRobots}
+        mapData={currentMapData}
       />
     </div>
   );

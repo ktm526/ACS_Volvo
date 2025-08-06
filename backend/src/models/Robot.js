@@ -33,6 +33,11 @@ class Robot {
     this.error_msg = data.error_msg;
     this.amr_timestamp = data.amr_timestamp;
     
+    // 태스크 관련 필드들
+    this.current_task_id = data.current_task_id;
+    this.current_waypoint_index = data.current_waypoint_index || 0;
+    this.task_status = data.task_status || 'idle';
+    
     this.last_updated = data.last_updated;
     this.last_status_check = data.last_status_check;
   }

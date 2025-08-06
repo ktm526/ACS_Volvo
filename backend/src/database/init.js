@@ -191,15 +191,18 @@ const initializeDatabase = () => {
       db.run(`
         CREATE TABLE IF NOT EXISTS missions (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
           robot_id INTEGER,
           mission_type TEXT NOT NULL,
           status TEXT DEFAULT 'pending',
+          priority TEXT DEFAULT 'medium',
+          waypoints TEXT,
+          description TEXT,
+          progress REAL DEFAULT 0,
           start_time DATETIME DEFAULT CURRENT_TIMESTAMP,
           end_time DATETIME,
-          start_x REAL,
-          start_y REAL,
-          target_x REAL,
-          target_y REAL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (robot_id) REFERENCES robots(id)
         )
       `, (err) => {

@@ -13,7 +13,8 @@ const Sidebar = ({
   onTrackToggle,
   isLoading = false,
   isMobile = false,
-  onClose
+  onClose,
+  onOpenTaskModal
 }) => {
   const stats = calculateStats(robots);
   const missionStats = calculateMissionStats(missions);
@@ -445,10 +446,7 @@ const Sidebar = ({
                 
                 {/* 작업 추가 버튼 */}
                 <button
-                  onClick={() => {
-                    // TODO: 작업 추가 모달 또는 페이지로 이동
-                    console.log('작업 추가 버튼 클릭');
-                  }}
+                  onClick={onOpenTaskModal}
                   style={{
                     width: '100%',
                     padding: isMobile ? 'var(--space-md)' : 'var(--space-lg)',

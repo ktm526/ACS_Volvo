@@ -3,6 +3,7 @@ const { connect } = require('./src/database/connection');
 const { initializeDatabase } = require('./src/database/init');
 const { seedAll } = require('./src/database/seedData');
 const robotStatusService = require('./src/services/robotStatusService');
+const taskManagementService = require('./src/services/taskManagementService');
 
 const PORT = process.env.PORT || 3000;
 
@@ -22,6 +23,12 @@ async function startServer() {
     setTimeout(() => {
       robotStatusService.start();
     }, 2000); // 서버 완전 시작 후 2초 뒤에 시작
+
+    // 태스크 관리 서비스 시작
+    console.log('태스크 관리 서비스를 초기화하는 중...');
+    setTimeout(() => {
+      taskManagementService.start();
+    }, 3000); // 로봇 상태 수집 서비스 시작 후 1초 뒤에 시작
     
     // 서버 시작
     app.listen(PORT, () => {
@@ -42,6 +49,9 @@ process.on('SIGINT', async () => {
   // 로봇 상태 수집 서비스 중지
   robotStatusService.stop();
   
+  // 태스크 관리 서비스 중지
+  taskManagementService.stop();
+  
   const { close } = require('./src/database/connection');
   await close();
   process.exit(0);
@@ -52,6 +62,9 @@ process.on('SIGTERM', async () => {
   
   // 로봇 상태 수집 서비스 중지
   robotStatusService.stop();
+  
+  // 태스크 관리 서비스 중지
+  taskManagementService.stop();
   
   const { close } = require('./src/database/connection');
   await close();

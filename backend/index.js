@@ -462,13 +462,116 @@ app.patch('/api/robots/:id/location', (req, res) => {
 
 // 임무 관련 API
 app.get('/api/missions', (req, res) => {
-  db.all('SELECT * FROM missions', [], (err, rows) => {
+  db.all('SELECT * FROM missions ORDER BY created_at DESC', [], (err, rows) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
     }
-    res.json({ data: rows });
+    
+    // waypoints JSON 파싱 및 필드 매핑
+    const processedMissions = rows.map(mission => {
+      const processed = { ...mission };
+      
+      // waypoints JSON 파싱
+      if (processed.waypoints) {
+        try {
+          processed.waypoints = JSON.parse(processed.waypoints);
+        } catch (e) {
+          console.warn('웨이포인트 JSON 파싱 실패:', e);
+          processed.waypoints = [];
+        }
+      } else {
+        processed.waypoints = [];
+      }
+      
+      // MissionCard에서 사용하기 위한 필드 매핑
+      processed.type = processed.mission_type;
+      processed.assignedRobot = processed.robot_id ? `AMR-${processed.robot_id}` : 'N/A';
+      processed.createdTime = processed.created_at;
+      processed.startTime = processed.start_time;
+      processed.endTime = processed.end_time;
+      
+      return processed;
+    });
+    
+    res.json({ data: processedMissions });
   });
+});
+
+// 새 임무 생성
+app.post('/api/missions', (req, res) => {
+  const { 
+    name, 
+    robot_id, 
+    mission_type, 
+    status, 
+    priority, 
+    waypoints,
+    description 
+  } = req.body;
+  
+  // 필수 필드 검증
+  if (!name || name.trim() === '') {
+    return res.status(400).json({ error: '미션 이름은 필수입니다.' });
+  }
+  
+  if (!mission_type || mission_type.trim() === '') {
+    return res.status(400).json({ error: '미션 타입은 필수입니다.' });
+  }
+  
+  if (!waypoints || !Array.isArray(waypoints) || waypoints.length === 0) {
+    return res.status(400).json({ error: '최소 하나의 웨이포인트가 필요합니다.' });
+  }
+  
+  // 기본값 설정
+  const missionStatus = status || 'pending';
+  const missionPriority = priority || 'medium';
+  const waypointsJson = JSON.stringify(waypoints);
+  
+  db.run(
+    `INSERT INTO missions (
+      name, robot_id, mission_type, status, priority, waypoints, description, 
+      start_time, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+    [
+      name.trim(), 
+      robot_id || null, 
+      mission_type.trim(), 
+      missionStatus, 
+      missionPriority,
+      waypointsJson,
+      description || ''
+    ],
+    function(err) {
+      if (err) {
+        console.error('미션 생성 에러:', err.message);
+        res.status(500).json({ error: '미션 생성 중 오류가 발생했습니다.' });
+        return;
+      }
+      
+      // 생성된 미션 정보 반환
+      db.get('SELECT * FROM missions WHERE id = ?', [this.lastID], (err, row) => {
+        if (err) {
+          res.status(500).json({ error: err.message });
+          return;
+        }
+        
+        // waypoints JSON 파싱
+        if (row.waypoints) {
+          try {
+            row.waypoints = JSON.parse(row.waypoints);
+          } catch (e) {
+            console.warn('웨이포인트 JSON 파싱 실패:', e);
+          }
+        }
+        
+        res.status(201).json({ 
+          message: '미션이 성공적으로 생성되었습니다.', 
+          data: row 
+        });
+      });
+    }
+  );
 });
 
 // 서버 실행
