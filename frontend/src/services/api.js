@@ -4,13 +4,13 @@ import { API_ENDPOINTS } from '../constants';
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 // axios 인스턴스 생성
-const api = axios.create({
+const apiClient = axios.create({
   baseURL: BASE_URL,
   timeout: 10000,
 });
 
 // 요청 인터셉터
-api.interceptors.request.use(
+apiClient.interceptors.request.use(
   (config) => {
     console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
     return config;
@@ -21,7 +21,7 @@ api.interceptors.request.use(
 );
 
 // 응답 인터셉터
-api.interceptors.response.use(
+apiClient.interceptors.response.use(
   (response) => {
     return response;
   },
@@ -36,7 +36,7 @@ export const robotsAPI = {
   // 모든 로봇 조회
   getAll: async () => {
     try {
-      const response = await api.get(API_ENDPOINTS.ROBOTS);
+      const response = await apiClient.get(API_ENDPOINTS.ROBOTS);
       return response.data;
     } catch (error) {
       throw new Error('로봇 데이터를 불러오는데 실패했습니다.');
@@ -46,7 +46,7 @@ export const robotsAPI = {
   // 특정 로봇 조회
   getById: async (id) => {
     try {
-      const response = await api.get(`${API_ENDPOINTS.ROBOTS}/${id}`);
+      const response = await apiClient.get(`${API_ENDPOINTS.ROBOTS}/${id}`);
       return response.data;
     } catch (error) {
       throw new Error('로봇 정보를 불러오는데 실패했습니다.');
@@ -56,7 +56,7 @@ export const robotsAPI = {
   // 로봇 상태 업데이트
   updateStatus: async (id, status) => {
     try {
-      const response = await api.patch(`${API_ENDPOINTS.ROBOTS}/${id}/status`, { status });
+      const response = await apiClient.patch(`${API_ENDPOINTS.ROBOTS}/${id}/status`, { status });
       return response.data;
     } catch (error) {
       throw new Error('로봇 상태 업데이트에 실패했습니다.');
@@ -66,7 +66,7 @@ export const robotsAPI = {
   // 로봇 위치 업데이트
   updateLocation: async (id, location) => {
     try {
-      const response = await api.patch(`${API_ENDPOINTS.ROBOTS}/${id}/location`, location);
+      const response = await apiClient.patch(`${API_ENDPOINTS.ROBOTS}/${id}/location`, location);
       return response.data;
     } catch (error) {
       throw new Error('로봇 위치 업데이트에 실패했습니다.');
@@ -76,7 +76,7 @@ export const robotsAPI = {
   // 로봇 방향 업데이트
   updateAngle: async (id, angle) => {
     try {
-      const response = await api.patch(`${API_ENDPOINTS.ROBOTS}/${id}/location`, { angle });
+      const response = await apiClient.patch(`${API_ENDPOINTS.ROBOTS}/${id}/location`, { angle });
       return response.data;
     } catch (error) {
       throw new Error('로봇 방향 업데이트에 실패했습니다.');
@@ -86,7 +86,7 @@ export const robotsAPI = {
   // AMR 이동 요청
   requestMove: async (robotId, nodeId) => {
     try {
-      const response = await api.post(API_ENDPOINTS.MOVE_REQUEST, {
+      const response = await apiClient.post(API_ENDPOINTS.MOVE_REQUEST, {
         robotId,
         nodeId,
         timestamp: new Date().toISOString()
@@ -104,7 +104,7 @@ export const missionsAPI = {
   // 모든 임무 조회
   getAll: async () => {
     try {
-      const response = await api.get(API_ENDPOINTS.MISSIONS);
+      const response = await apiClient.get(API_ENDPOINTS.MISSIONS);
       return response.data;
     } catch (error) {
       throw new Error('임무 데이터를 불러오는데 실패했습니다.');
@@ -114,7 +114,7 @@ export const missionsAPI = {
   // 특정 임무 조회
   getById: async (id) => {
     try {
-      const response = await api.get(`${API_ENDPOINTS.MISSIONS}/${id}`);
+      const response = await apiClient.get(`${API_ENDPOINTS.MISSIONS}/${id}`);
       return response.data;
     } catch (error) {
       throw new Error('임무 정보를 불러오는데 실패했습니다.');
@@ -124,7 +124,7 @@ export const missionsAPI = {
   // 새 임무 생성
   create: async (missionData) => {
     try {
-      const response = await api.post(API_ENDPOINTS.MISSIONS, missionData);
+      const response = await apiClient.post(API_ENDPOINTS.MISSIONS, missionData);
       return response.data;
     } catch (error) {
       throw new Error('임무 생성에 실패했습니다.');
@@ -134,7 +134,7 @@ export const missionsAPI = {
   // 임무 상태 업데이트
   updateStatus: async (id, status) => {
     try {
-      const response = await api.patch(`${API_ENDPOINTS.MISSIONS}/${id}/status`, { status });
+      const response = await apiClient.patch(`${API_ENDPOINTS.MISSIONS}/${id}/status`, { status });
       return response.data;
     } catch (error) {
       throw new Error('임무 상태 업데이트에 실패했습니다.');
@@ -144,7 +144,7 @@ export const missionsAPI = {
   // 임무 삭제
   delete: async (id) => {
     try {
-      const response = await api.delete(`${API_ENDPOINTS.MISSIONS}/${id}`);
+      const response = await apiClient.delete(`${API_ENDPOINTS.MISSIONS}/${id}`);
       return response.data;
     } catch (error) {
       throw new Error('임무 삭제에 실패했습니다.');
@@ -153,6 +153,17 @@ export const missionsAPI = {
 };
 
 // 테스트 데이터 (서버 연결 실패 시 사용)
+// 통합 API 객체 (Sidebar에서 사용)
+export const api = {
+  getRobots: () => robotsAPI.getAll(),
+  getMissions: () => missionsAPI.getAll(),
+  createMission: (data) => missionsAPI.create(data),
+  updateMissionStatus: (id, status) => missionsAPI.updateStatus(id, status),
+  deleteMission: (id) => missionsAPI.delete(id),
+  updateRobotStatus: (id, status) => robotsAPI.updateStatus(id, status),
+  updateRobotLocation: (id, location) => robotsAPI.updateLocation(id, location)
+};
+
 export const mockData = {
   robots: [
     { 
@@ -238,4 +249,4 @@ export const mockData = {
   ]
 };
 
-export default api; 
+export default apiClient; 

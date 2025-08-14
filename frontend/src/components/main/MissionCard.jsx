@@ -1,20 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getPriorityColor, getTypeIcon } from '../../utils/mainPageUtils';
 import { getStatusColor, getStatusIcon } from '../../constants';
+import MissionDetailModal from './MissionDetailModal';
 
-const MissionCard = ({ mission, isMobile = false }) => {
+const MissionCard = ({ mission, isMobile = false, lastUpdateTime }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const prevMissionRef = useRef(mission);
   
-  // 안전한 기본값 설정
-  const name = mission?.name || 'Unknown Mission';
-  const type = mission?.type || 'unknown';
+  // 안전한 기본값 설정 - 백엔드 데이터 구조에 맞게 수정
+  const title = mission?.title || mission?.name || 'Unknown Mission';
+  const type = mission?.mission_type || mission?.type || 'transport';
   const status = mission?.status || 'pending';
-  const priority = mission?.priority || 'low';
-  const assignedRobot = mission?.assignedRobot || 'N/A';
+  const priority = mission?.priority || 'medium';
+  const robotId = mission?.robot_id;
+  const robotName = mission?.robot_name || (robotId ? `Robot ${robotId}` : 'N/A');
   const progress = mission?.progress || 0;
+  const id = mission?.id;
   
   const statusColor = getStatusColor(status);
   const priorityColor = getPriorityColor(priority);
+
+  // 업데이트 감지 및 애니메이션
+  useEffect(() => {
+    if (prevMissionRef.current && lastUpdateTime) {
+      const prev = prevMissionRef.current;
+      const hasChanges = 
+        prev.status !== mission?.status ||
+        prev.progress !== mission?.progress ||
+        prev.robot_id !== mission?.robot_id;
+      
+      if (hasChanges) {
+        setIsUpdating(true);
+        const timer = setTimeout(() => setIsUpdating(false), 1000);
+        return () => clearTimeout(timer);
+      }
+    }
+    prevMissionRef.current = mission;
+  }, [mission, lastUpdateTime]);
   
   // Date 객체를 안전하게 포맷팅하는 함수
   const formatDateTime = (dateValue) => {
@@ -55,6 +79,41 @@ const MissionCard = ({ mission, isMobile = false }) => {
     }
   };
 
+  // 상태별 한국어 표시
+  const getStatusText = (status) => {
+    const statusMap = {
+      'pending': '대기중',
+      'in_progress': '진행중',
+      'completed': '완료',
+      'failed': '실패',
+      'cancelled': '취소됨'
+    };
+    return statusMap[status] || status;
+  };
+
+  // 우선순위별 한국어 표시
+  const getPriorityText = (priority) => {
+    const priorityMap = {
+      'high': '높음',
+      'medium': '보통',
+      'low': '낮음'
+    };
+    return priorityMap[priority] || priority;
+  };
+
+  // 미션 타입별 한국어 표시
+  const getTypeText = (type) => {
+    const typeMap = {
+      'transport': '운송',
+      'delivery': '배송',
+      'pickup': '픽업',
+      'cleaning': '청소',
+      'inspection': '점검',
+      'maintenance': '정비'
+    };
+    return typeMap[type] || type;
+  };
+
   // 카드 스타일 계산
   const getCardStyle = () => {
     const baseStyle = {
@@ -69,7 +128,19 @@ const MissionCard = ({ mission, isMobile = false }) => {
       backfaceVisibility: 'hidden'
     };
 
-    if (isHovered) {
+    if (isUpdating) {
+      return {
+        ...baseStyle,
+        background: `linear-gradient(135deg, var(--bg-card) 0%, var(--primary-color)08 100%)`,
+        border: `2px solid var(--primary-color)60`,
+        boxShadow: `
+          0 0 25px var(--primary-color)50,
+          0 0 50px var(--primary-color)25,
+          0 0 100px var(--primary-color)15
+        `,
+        transform: 'translateZ(0) scale(1.02) translateY(-2px)'
+      };
+    } else if (isHovered) {
       return {
         ...baseStyle,
         background: `linear-gradient(135deg, var(--bg-card) 0%, ${statusColor}03 100%)`,
@@ -93,11 +164,13 @@ const MissionCard = ({ mission, isMobile = false }) => {
   };
 
   return (
-    <div
-      style={getCardStyle()}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
+    <>
+      <div
+        style={getCardStyle()}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onClick={() => setShowModal(true)}
+      >
       {/* 우선순위 표시 바 */}
       <div style={{
         position: 'absolute',
@@ -109,18 +182,37 @@ const MissionCard = ({ mission, isMobile = false }) => {
         boxShadow: `0 0 15px ${priorityColor}60`
       }} />
 
-      {/* 빛나는 배경 효과 (호버 시) */}
-      {isHovered && (
+      {/* 빛나는 배경 효과 (호버 시 또는 업데이트 시) */}
+      {(isHovered || isUpdating) && (
         <div style={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          background: `radial-gradient(circle at 30% 30%, ${statusColor}08, transparent 70%)`,
-          opacity: 0.4,
+          background: isUpdating 
+            ? `radial-gradient(circle at 50% 50%, var(--primary-color)12, transparent 70%)`
+            : `radial-gradient(circle at 30% 30%, ${statusColor}08, transparent 70%)`,
+          opacity: isUpdating ? 0.6 : 0.4,
           transition: 'opacity 0.3s ease',
-          willChange: 'opacity'
+          willChange: 'opacity',
+          animation: isUpdating ? 'pulse 1s ease-in-out' : 'none'
+        }} />
+      )}
+
+      {/* 업데이트 표시등 */}
+      {isUpdating && (
+        <div style={{
+          position: 'absolute',
+          top: '8px',
+          right: '8px',
+          width: '8px',
+          height: '8px',
+          borderRadius: '50%',
+          backgroundColor: 'var(--primary-color)',
+          boxShadow: `0 0 15px var(--primary-color)80`,
+          animation: 'pulse 1s ease-in-out',
+          zIndex: 10
         }} />
       )}
 
@@ -166,7 +258,7 @@ const MissionCard = ({ mission, isMobile = false }) => {
               color: 'var(--text-primary)',
               textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
             }}>
-              {name}
+              {title}
             </div>
             <div style={{
               fontSize: '11px',
@@ -175,12 +267,12 @@ const MissionCard = ({ mission, isMobile = false }) => {
               letterSpacing: '0.5px',
               marginTop: '2px'
             }}>
-              {type}
+              {getTypeText(type)} • ID: {id}
             </div>
           </div>
         </div>
         
-        {/* 상태 표시만 남김 */}
+        {/* 상태 표시 */}
         <div style={{
           padding: isMobile ? '4px 8px' : '6px 10px',
           background: `linear-gradient(135deg, ${statusColor}20, ${statusColor}10)`,
@@ -197,11 +289,11 @@ const MissionCard = ({ mission, isMobile = false }) => {
           `,
           textShadow: `0 0 5px ${statusColor}40`
         }}>
-          {status}
+          {getStatusText(status)}
         </div>
       </div>
 
-      {/* AMR 및 진행률 표시 */}
+      {/* 로봇 및 진행률 표시 */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -210,7 +302,7 @@ const MissionCard = ({ mission, isMobile = false }) => {
         position: 'relative',
         zIndex: 1
       }}>
-        {/* AMR 정보 (1 비율) */}
+        {/* 로봇 정보 */}
         <div style={{
           flex: 1,
           display: 'flex',
@@ -222,10 +314,11 @@ const MissionCard = ({ mission, isMobile = false }) => {
           overflow: 'hidden',
           textOverflow: 'ellipsis'
         }}>
-          {assignedRobot}
+          <i className="fas fa-robot" style={{ marginRight: '6px', color: 'var(--text-secondary)' }}></i>
+          {robotName}
         </div>
         
-        {/* 진행률 (3 비율) */}
+        {/* 진행률 */}
         <div style={{
           flex: 3,
           display: 'flex',
@@ -257,7 +350,7 @@ const MissionCard = ({ mission, isMobile = false }) => {
                 progress >= 50 ? 
                 `linear-gradient(90deg, #ffdd00, #ffcc00)` :
                 `linear-gradient(90deg, #ff8800, #ff7700)`,
-              transition: 'width 0.3s ease',
+              transition: 'width 0.6s ease-out',
               borderRadius: '4px',
               boxShadow: progress >= 100 ? 
                 `0 0 8px #00ff8840` :
@@ -265,7 +358,8 @@ const MissionCard = ({ mission, isMobile = false }) => {
                 `0 0 8px #00d4ff40` :
                 progress >= 50 ? 
                 `0 0 8px #ffdd0040` :
-                `0 0 8px #ff880040`
+                `0 0 8px #ff880040`,
+              animation: isUpdating ? 'pulse 0.5s ease-in-out' : 'none'
             }} />
           </div>
           <div style={{
@@ -319,7 +413,7 @@ const MissionCard = ({ mission, isMobile = false }) => {
             <span style={{ 
               fontWeight: '600',
               minWidth: '45px'
-            }}>생성 시각:</span>
+            }}>생성:</span>
             <span style={{ 
               color: 'var(--text-primary)',
               fontWeight: '600',
@@ -328,7 +422,7 @@ const MissionCard = ({ mission, isMobile = false }) => {
               overflow: 'hidden',
               textOverflow: 'ellipsis'
             }}>
-              {formatDateTime(mission?.createdTime)}
+              {formatDateTime(mission?.created_at)}
             </span>
           </div>
           
@@ -344,7 +438,7 @@ const MissionCard = ({ mission, isMobile = false }) => {
             <span style={{ 
               fontWeight: '600',
               minWidth: '45px'
-            }}>시작 시각:</span>
+            }}>시작:</span>
             <span style={{ 
               color: 'var(--text-primary)',
               fontWeight: '600',
@@ -353,7 +447,7 @@ const MissionCard = ({ mission, isMobile = false }) => {
               overflow: 'hidden',
               textOverflow: 'ellipsis'
             }}>
-              {formatDateTime(mission?.startTime)}
+              {formatDateTime(mission?.start_time)}
             </span>
           </div>
         </div>
@@ -394,7 +488,7 @@ const MissionCard = ({ mission, isMobile = false }) => {
               overflow: 'hidden',
               textOverflow: 'ellipsis'
             }}>
-              {priority}
+              {getPriorityText(priority)}
             </span>
           </div>
           
@@ -410,7 +504,7 @@ const MissionCard = ({ mission, isMobile = false }) => {
             <span style={{ 
               fontWeight: '600',
               minWidth: '45px'
-            }}>종료 시각:</span>
+            }}>완료:</span>
             <span style={{ 
               color: 'var(--text-primary)',
               fontWeight: '600',
@@ -419,12 +513,18 @@ const MissionCard = ({ mission, isMobile = false }) => {
               overflow: 'hidden',
               textOverflow: 'ellipsis'
             }}>
-              {formatDateTime(mission?.endTime)}
+              {formatDateTime(mission?.end_time)}
             </span>
-          </div>
+                    </div>
         </div>
       </div>
-    </div>
+       
+      <MissionDetailModal
+        mission={mission}
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+      />
+    </>
   );
 };
 

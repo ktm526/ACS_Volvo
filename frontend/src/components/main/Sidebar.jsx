@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import RobotCard from './RobotCard';
 import MissionCard from './MissionCard';
 import { calculateStats, calculateMissionStats } from '../../utils/mainPageUtils';
+import { api } from '../../services/api';
 
 const Sidebar = ({ 
   sidebarTab, 
@@ -16,8 +17,45 @@ const Sidebar = ({
   onClose,
   onOpenTaskModal
 }) => {
-  const stats = calculateStats(robots);
-  const missionStats = calculateMissionStats(missions);
+  const [localMissions, setLocalMissions] = useState(missions);
+  const [localRobots, setLocalRobots] = useState(robots);
+  const [lastUpdateTime, setLastUpdateTime] = useState(Date.now());
+  
+  const stats = calculateStats(localRobots);
+  const missionStats = calculateMissionStats(localMissions);
+
+  // 데이터 업데이트 함수
+  const updateData = useCallback(async () => {
+    try {
+      const [robotsResponse, missionsResponse] = await Promise.all([
+        api.getRobots(),
+        api.getMissions()
+      ]);
+      
+      setLocalRobots(robotsResponse.data || []);
+      setLocalMissions(missionsResponse.data || []);
+      setLastUpdateTime(Date.now());
+    } catch (error) {
+      console.error('데이터 업데이트 실패:', error);
+    }
+  }, []);
+
+  // 초기 데이터 설정
+  useEffect(() => {
+    setLocalRobots(robots);
+    setLocalMissions(missions);
+  }, [robots, missions]);
+
+  // 실시간 데이터 업데이트
+  useEffect(() => {
+    // 즉시 한 번 업데이트
+    updateData();
+    
+    // 3초마다 자동 업데이트
+    const interval = setInterval(updateData, 3000);
+    
+    return () => clearInterval(interval);
+  }, [updateData]);
 
   // 동적 CSS 애니메이션 주입
   useEffect(() => {
@@ -36,6 +74,10 @@ const Sidebar = ({
       @keyframes loading-shimmer {
         0% { transform: translateX(-100%); }
         100% { transform: translateX(100%); }
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
       }
     `;
     document.head.appendChild(style);
@@ -213,6 +255,18 @@ const Sidebar = ({
                   color: 'var(--primary-color)'
                 }}>
                   {isLoading ? '---' : stats.total}
+                  {!isLoading && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '2px',
+                      right: '2px',
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      backgroundColor: 'var(--status-success)',
+                      animation: 'pulse 2s infinite'
+                    }} />
+                  )}
                 </div>
                 <div style={{
                   fontSize: 'var(--font-size-xs)',
@@ -423,9 +477,9 @@ const Sidebar = ({
           <>
             {sidebarTab === 'robots' ? (
               // 로봇 목록
-              robots.map(robot => (
+              localRobots.map(robot => (
                 <RobotCard
-                  key={robot.id}
+                  key={`${robot.id}-${lastUpdateTime}`}
                   robot={robot}
                   isTracked={trackedRobot === robot.id}
                   onShowDetail={onShowRobotDetail}
@@ -436,11 +490,12 @@ const Sidebar = ({
             ) : (
               // 작업 목록
               <>
-                {missions.map(mission => (
+                {localMissions.map(mission => (
                   <MissionCard
-                    key={mission.id}
+                    key={`${mission.id}-${lastUpdateTime}`}
                     mission={mission}
                     isMobile={isMobile}
+                    lastUpdateTime={lastUpdateTime}
                   />
                 ))}
                 

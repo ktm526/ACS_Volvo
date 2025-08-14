@@ -10,10 +10,55 @@ const RobotDetailModal = ({ robot, isOpen, onClose }) => {
     x: robot.location_x !== undefined ? robot.location_x : 0,
     y: robot.location_y !== undefined ? robot.location_y : 0
   };
-  const battery = robot.battery || 0;
+  const battery = robot.battery || robot.battery_soc || 0;
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString('ko-KR');
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleString('ko-KR');
+    } catch (error) {
+      return 'N/A';
+    }
+  };
+
+  const formatBoolean = (value) => {
+    if (value === true || value === 1) return '예';
+    if (value === false || value === 0) return '아니오';
+    return 'N/A';
+  };
+
+  const getStatusText = (status) => {
+    const statusMap = {
+      'idle': '대기중',
+      'moving': '이동중',
+      'charging': '충전중',
+      'error': '오류',
+      'disconnected': '연결끊김'
+    };
+    return statusMap[status] || status;
+  };
+
+  const getDrivingStatusText = (drivingStatus) => {
+    const statusMap = {
+      0: '정지',
+      1: '이동중',
+      2: '회전중',
+      3: '후진중'
+    };
+    return statusMap[drivingStatus] || `상태 ${drivingStatus}`;
+  };
+
+  const getDrivingModeText = (drivingMode) => {
+    const modeMap = {
+      0: '수동',
+      1: '자동',
+      2: '원격제어'
+    };
+    return modeMap[drivingMode] || `모드 ${drivingMode}`;
+  };
+
+  const getConnectionStatusColor = (connected) => {
+    return (connected === true || connected === 1) ? 'var(--status-success)' : 'var(--status-error)';
   };
 
   const handleOverlayClick = (e) => {
@@ -21,6 +66,62 @@ const RobotDetailModal = ({ robot, isOpen, onClose }) => {
       onClose();
     }
   };
+
+  // 정보 항목 컴포넌트
+  const InfoItem = ({ label, value, color, isMonospace = false, unit = '' }) => (
+    <div style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 'var(--space-sm) 0',
+      borderBottom: '1px solid var(--border-primary)'
+    }}>
+      <span style={{
+        fontSize: 'var(--font-size-sm)',
+        color: 'var(--text-secondary)',
+        fontWeight: '600'
+      }}>
+        {label}
+      </span>
+      <span style={{
+        fontSize: 'var(--font-size-sm)',
+        color: color || 'var(--text-primary)',
+        fontWeight: '600',
+        fontFamily: isMonospace ? '"Pretendard Variable", "Pretendard", "SF Mono", Monaco, Inconsolata, "Roboto Mono", "Source Code Pro", monospace' : 'inherit'
+      }}>
+        {value}{unit}
+      </span>
+    </div>
+  );
+
+  // 섹션 컴포넌트
+  const Section = ({ title, children, columns = 1 }) => (
+    <div style={{
+      marginBottom: 'var(--space-lg)'
+    }}>
+      <h3 style={{
+        margin: '0 0 var(--space-md) 0',
+        fontSize: 'var(--font-size-base)',
+        fontWeight: '700',
+        color: 'var(--text-primary)',
+        borderLeft: '3px solid var(--primary-color)',
+        paddingLeft: 'var(--space-sm)'
+      }}>
+        {title}
+      </h3>
+      <div style={{
+        padding: 'var(--space-md)',
+        backgroundColor: 'var(--bg-secondary)',
+        borderRadius: 'var(--radius-md)',
+        border: '1px solid var(--border-primary)',
+        display: 'grid',
+        gridTemplateColumns: columns > 1 ? `repeat(${columns}, 1fr)` : '1fr',
+        gap: columns > 1 ? 'var(--space-md)' : '0'
+      }}>
+        {children}
+      </div>
+    </div>
+  );
 
   return (
     <div
@@ -30,12 +131,13 @@ const RobotDetailModal = ({ robot, isOpen, onClose }) => {
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1000,
-        backdropFilter: 'blur(2px)'
+        zIndex: 9999,
+        backdropFilter: 'blur(3px)',
+        padding: '20px'
       }}
       onClick={handleOverlayClick}
     >
@@ -44,11 +146,11 @@ const RobotDetailModal = ({ robot, isOpen, onClose }) => {
           backgroundColor: 'var(--bg-primary)',
           borderRadius: 'var(--radius-lg)',
           padding: 'var(--space-lg)',
-          maxWidth: '500px',
-          width: '90%',
-          maxHeight: '80vh',
+          maxWidth: '900px',
+          width: '100%',
+          maxHeight: '95vh',
           overflowY: 'auto',
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
+          boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)',
           border: '1px solid var(--border-primary)'
         }}
       >
@@ -95,7 +197,7 @@ const RobotDetailModal = ({ robot, isOpen, onClose }) => {
                 fontSize: 'var(--font-size-sm)',
                 color: 'var(--text-tertiary)'
               }}>
-                ID: {robot.id}
+                로봇 ID: {robot.id} • IP: {robot.ip_address || 'N/A'}
               </p>
             </div>
           </div>
@@ -128,26 +230,15 @@ const RobotDetailModal = ({ robot, isOpen, onClose }) => {
           </button>
         </div>
 
-        {/* 기본 정보 */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: 'var(--space-md)',
-          marginBottom: 'var(--space-lg)'
-        }}>
-          {/* 상태 */}
-          <div style={{
-            padding: 'var(--space-md)',
-            backgroundColor: 'var(--bg-secondary)',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--border-primary)'
-          }}>
+        {/* 기본 상태 정보 */}
+        <Section title="기본 상태" columns={2}>
+          <div>
             <div style={{
               fontSize: 'var(--font-size-sm)',
               color: 'var(--text-secondary)',
               marginBottom: 'var(--space-xs)'
             }}>
-              상태
+              현재 상태
             </div>
             <div style={{
               display: 'flex',
@@ -161,27 +252,20 @@ const RobotDetailModal = ({ robot, isOpen, onClose }) => {
                 fontSize: 'var(--font-size-sm)',
                 fontWeight: '600',
                 color: statusColor,
-                textTransform: 'uppercase',
                 border: `1px solid ${statusColor}40`
               }}>
-                {robot.status}
+                {getStatusText(robot.status)}
               </div>
             </div>
           </div>
 
-          {/* 배터리 */}
-          <div style={{
-            padding: 'var(--space-md)',
-            backgroundColor: 'var(--bg-secondary)',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--border-primary)'
-          }}>
+          <div>
             <div style={{
               fontSize: 'var(--font-size-sm)',
               color: 'var(--text-secondary)',
               marginBottom: 'var(--space-xs)'
             }}>
-              배터리
+              연결 상태
             </div>
             <div style={{
               display: 'flex',
@@ -189,194 +273,163 @@ const RobotDetailModal = ({ robot, isOpen, onClose }) => {
               gap: 'var(--space-sm)'
             }}>
               <div style={{
-                flex: 1,
-                height: '6px',
-                backgroundColor: 'var(--bg-tertiary)',
-                borderRadius: '3px',
-                overflow: 'hidden'
-              }}>
-                <div style={{
-                  height: '100%',
-                  width: `${battery}%`,
-                  backgroundColor: battery > 30 ? 'var(--status-success)' : 
-                                   battery > 15 ? 'var(--status-warning)' : 'var(--status-error)',
-                  borderRadius: '3px',
-                  transition: 'width 0.3s ease'
-                }}></div>
-              </div>
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: getConnectionStatusColor(robot.connection_status),
+                boxShadow: `0 0 8px ${getConnectionStatusColor(robot.connection_status)}60`
+              }} />
               <span style={{
                 fontSize: 'var(--font-size-sm)',
+                fontWeight: '600',
+                color: getConnectionStatusColor(robot.connection_status)
+              }}>
+                {formatBoolean(robot.connection_status)}
+              </span>
+            </div>
+          </div>
+        </Section>
+
+        {/* 배터리 정보 */}
+        <Section title="배터리 정보">
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 'var(--space-md)',
+            marginBottom: 'var(--space-md)'
+          }}>
+            <div>
+              <div style={{
+                fontSize: 'var(--font-size-xs)',
+                color: 'var(--text-tertiary)',
+                marginBottom: 'var(--space-xs)'
+              }}>
+                충전량 (SOC)
+              </div>
+              <div style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: '700',
+                color: battery > 30 ? 'var(--status-success)' : 
+                       battery > 15 ? 'var(--status-warning)' : 'var(--status-error)'
+              }}>
+                {robot.battery_soc || battery}%
+              </div>
+            </div>
+            <div>
+              <div style={{
+                fontSize: 'var(--font-size-xs)',
+                color: 'var(--text-tertiary)',
+                marginBottom: 'var(--space-xs)'
+              }}>
+                전압
+              </div>
+              <div style={{
+                fontSize: 'var(--font-size-base)',
+                fontWeight: '600',
+                color: 'var(--text-primary)',
+                fontFamily: 'monospace'
+              }}>
+                {robot.battery_voltage || 0}V
+              </div>
+            </div>
+            <div>
+              <div style={{
+                fontSize: 'var(--font-size-xs)',
+                color: 'var(--text-tertiary)',
+                marginBottom: 'var(--space-xs)'
+              }}>
+                건강도 (SOH)
+              </div>
+              <div style={{
+                fontSize: 'var(--font-size-base)',
                 fontWeight: '600',
                 color: 'var(--text-primary)'
               }}>
-                {battery}%
-              </span>
+                {robot.battery_soh || 100}%
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* 위치 정보 */}
-        <div style={{
-          padding: 'var(--space-md)',
-          backgroundColor: 'var(--bg-secondary)',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--border-primary)',
-          marginBottom: 'var(--space-lg)'
-        }}>
           <div style={{
-            fontSize: 'var(--font-size-sm)',
-            color: 'var(--text-secondary)',
-            marginBottom: 'var(--space-md)'
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-sm)'
           }}>
-            위치 정보
+            <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
+              충전 중:
+            </span>
+            <span style={{
+              fontSize: 'var(--font-size-sm)',
+              fontWeight: '600',
+              color: robot.charging_status ? 'var(--status-success)' : 'var(--text-primary)'
+            }}>
+              {formatBoolean(robot.charging_status)}
+            </span>
           </div>
+        </Section>
+
+        {/* 위치 및 이동 정보 */}
+        <Section title="위치 및 이동 정보" columns={2}>
+          <div>
+            <InfoItem label="X 좌표" value={position.x.toFixed(2)} isMonospace={true} />
+            <InfoItem label="Y 좌표" value={position.y.toFixed(2)} isMonospace={true} />
+            <InfoItem label="각도" value={robot.angle || robot.position_theta || 0} isMonospace={true} unit="°" />
+          </div>
+          <div>
+            <InfoItem label="주행 상태" value={getDrivingStatusText(robot.driving_status)} />
+            <InfoItem label="주행 모드" value={getDrivingModeText(robot.driving_mode)} />
+            <InfoItem label="목적지 노드" value={robot.destination_node_id || 'N/A'} />
+          </div>
+        </Section>
+
+        {/* 속도 정보 */}
+        <Section title="속도 정보" columns={1}>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
+            gridTemplateColumns: 'repeat(3, 1fr)',
             gap: 'var(--space-md)'
           }}>
             <div>
-              <div style={{
-                fontSize: 'var(--font-size-xs)',
-                color: 'var(--text-tertiary)',
-                marginBottom: 'var(--space-xs)'
-              }}>
-                X 좌표
-              </div>
-              <div style={{
-                fontSize: 'var(--font-size-base)',
-                fontWeight: '600',
-                color: 'var(--text-primary)',
-                fontFamily: '"Pretendard Variable", "Pretendard", "SF Mono", Monaco, Inconsolata, "Roboto Mono", "Source Code Pro", monospace'
-              }}>
-                {position.x.toFixed(2)}
-              </div>
+              <InfoItem label="X 속도" value={robot.velocity_x || 0} isMonospace={true} unit=" m/s" />
             </div>
             <div>
-              <div style={{
-                fontSize: 'var(--font-size-xs)',
-                color: 'var(--text-tertiary)',
-                marginBottom: 'var(--space-xs)'
-              }}>
-                Y 좌표
-              </div>
-              <div style={{
-                fontSize: 'var(--font-size-base)',
-                fontWeight: '600',
-                color: 'var(--text-primary)',
-                fontFamily: '"Pretendard Variable", "Pretendard", "SF Mono", Monaco, Inconsolata, "Roboto Mono", "Source Code Pro", monospace'
-              }}>
-                {position.y.toFixed(2)}
-              </div>
+              <InfoItem label="Y 속도" value={robot.velocity_y || 0} isMonospace={true} unit=" m/s" />
+            </div>
+            <div>
+              <InfoItem label="각속도" value={robot.velocity_theta || 0} isMonospace={true} unit=" rad/s" />
             </div>
           </div>
-        </div>
+        </Section>
 
-        {/* 추가 정보 */}
-        <div style={{
-          display: 'grid',
-          gap: 'var(--space-md)'
-        }}>
-          {/* 스테이션 */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: 'var(--space-sm) 0',
-            borderBottom: '1px solid var(--border-primary)'
-          }}>
-            <span style={{
-              fontSize: 'var(--font-size-sm)',
-              color: 'var(--text-secondary)',
-              fontWeight: '600'
-            }}>
-              스테이션
-            </span>
-            <span style={{
-              fontSize: 'var(--font-size-sm)',
-              color: 'var(--text-primary)',
-              fontWeight: '600'
-            }}>
-              {robot.station || 'N/A'}
-            </span>
+        {/* 작업 정보 */}
+        <Section title="작업 정보">
+          <InfoItem label="현재 작업 ID" value={robot.current_task_id || '없음'} />
+          <InfoItem label="작업 상태" value={robot.task_status || 'idle'} />
+          <InfoItem label="현재 웨이포인트" value={robot.current_waypoint_index !== undefined ? robot.current_waypoint_index : 'N/A'} />
+          <InfoItem label="명령 상태" value={robot.order_status !== undefined ? robot.order_status : 'N/A'} />
+          <InfoItem label="경로 상태" value={robot.path_status || 'N/A'} />
+        </Section>
+
+        {/* 시스템 정보 */}
+        <Section title="시스템 정보" columns={2}>
+          <div>
+            <InfoItem label="로봇 모델" value={robot.robot_model || 'N/A'} />
+            <InfoItem label="하드웨어 버전" value={robot.hw_version || 'N/A'} isMonospace={true} />
+            <InfoItem label="소프트웨어 버전" value={robot.sw_version || 'N/A'} isMonospace={true} />
           </div>
-
-          {/* 현재 작업 */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: 'var(--space-sm) 0',
-            borderBottom: '1px solid var(--border-primary)'
-          }}>
-            <span style={{
-              fontSize: 'var(--font-size-sm)',
-              color: 'var(--text-secondary)',
-              fontWeight: '600'
-            }}>
-              현재 작업
-            </span>
-            <span style={{
-              fontSize: 'var(--font-size-sm)',
-              color: 'var(--text-primary)',
-              fontWeight: '600'
-            }}>
-              {robot.currentTask || '없음'}
-            </span>
+          <div>
+            <InfoItem label="포트" value={robot.port || 80} isMonospace={true} />
+            <InfoItem label="오류 코드" value={robot.error_code || 0} color={robot.error_code ? 'var(--status-error)' : 'var(--status-success)'} />
+            <InfoItem label="오류 메시지" value={robot.error_msg || '없음'} color={robot.error_msg ? 'var(--status-error)' : 'var(--status-success)'} />
           </div>
+        </Section>
 
-          {/* IP 주소 */}
-          {robot.ip_address && (
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: 'var(--space-sm) 0',
-              borderBottom: '1px solid var(--border-primary)'
-            }}>
-              <span style={{
-                fontSize: 'var(--font-size-sm)',
-                color: 'var(--text-secondary)',
-                fontWeight: '600'
-              }}>
-                IP 주소
-              </span>
-              <span style={{
-                fontSize: 'var(--font-size-sm)',
-                color: 'var(--text-primary)',
-                fontWeight: '600',
-                fontFamily: '"Pretendard Variable", "Pretendard", "SF Mono", Monaco, Inconsolata, "Roboto Mono", "Source Code Pro", monospace'
-              }}>
-                {robot.ip_address}
-              </span>
-            </div>
-          )}
-
-          {/* 마지막 업데이트 */}
-          {robot.last_updated && (
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: 'var(--space-sm) 0'
-            }}>
-              <span style={{
-                fontSize: 'var(--font-size-sm)',
-                color: 'var(--text-secondary)',
-                fontWeight: '600'
-              }}>
-                마지막 업데이트
-              </span>
-              <span style={{
-                fontSize: 'var(--font-size-sm)',
-                color: 'var(--text-primary)',
-                fontWeight: '600'
-              }}>
-                {formatDate(robot.last_updated)}
-              </span>
-            </div>
-          )}
-        </div>
+        {/* 타임스탬프 정보 */}
+        <Section title="시간 정보">
+          <InfoItem label="마지막 업데이트" value={formatDate(robot.last_updated)} isMonospace={true} />
+          <InfoItem label="마지막 상태 확인" value={formatDate(robot.last_status_check)} isMonospace={true} />
+          <InfoItem label="AMR 타임스탬프" value={formatDate(robot.amr_timestamp)} isMonospace={true} />
+          <InfoItem label="마지막 명령 전송" value={formatDate(robot.last_command_sent)} isMonospace={true} />
+        </Section>
       </div>
     </div>
   );
