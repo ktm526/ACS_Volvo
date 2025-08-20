@@ -11,6 +11,7 @@ const Sidebar = ({
   missions, 
   trackedRobot,
   onShowRobotDetail,
+  onShowMissionDetail,
   onTrackToggle,
   isLoading = false,
   isMobile = false,
@@ -99,7 +100,8 @@ const Sidebar = ({
       borderRight: '1px solid var(--border-primary)',
       display: 'flex',
       flexDirection: 'column',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      position: 'relative'
     }}>
       {/* 모바일 헤더 (닫기 버튼 포함) */}
       {isMobile && (
@@ -396,7 +398,9 @@ const Sidebar = ({
       <div style={{
         flex: 1,
         overflow: 'auto',
-        padding: isMobile ? 'var(--space-sm)' : 'var(--space-md)'
+        padding: isMobile ? 'var(--space-sm)' : 'var(--space-md)',
+        minHeight: 0,
+        position: 'relative'
       }}>
         {isLoading ? (
           // 로딩 중 스켈레톤 UI
@@ -489,62 +493,68 @@ const Sidebar = ({
               ))
             ) : (
               // 작업 목록
-              <>
-                {localMissions.map(mission => (
-                  <MissionCard
-                    key={`${mission.id}-${lastUpdateTime}`}
-                    mission={mission}
-                    isMobile={isMobile}
-                    lastUpdateTime={lastUpdateTime}
-                  />
-                ))}
-                
-                {/* 작업 추가 버튼 */}
-                <button
-                  onClick={onOpenTaskModal}
-                  style={{
-                    width: '100%',
-                    padding: isMobile ? 'var(--space-md)' : 'var(--space-lg)',
-                    marginTop: 'var(--space-md)',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    border: '2px dashed var(--border-primary)',
-                    borderRadius: 'var(--radius-lg)',
-                    color: 'var(--text-secondary)',
-                    fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-base)',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 'var(--space-sm)',
-                    position: 'relative',
-                    overflow: 'hidden'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = 'var(--bg-primary)';
-                    e.target.style.borderColor = 'var(--primary-color)';
-                    e.target.style.color = 'var(--text-primary)';
-                    e.target.style.boxShadow = '0 0 20px rgba(0, 212, 255, 0.3)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = 'var(--bg-tertiary)';
-                    e.target.style.borderColor = 'var(--border-primary)';
-                    e.target.style.color = 'var(--text-secondary)';
-                    e.target.style.boxShadow = 'none';
-                  }}
-                >
-                  <i className="fas fa-plus" style={{
-                    fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-base)',
-                    opacity: 0.7
-                  }}></i>
-                  <span>새 작업 추가</span>
-                </button>
-              </>
+              localMissions.map(mission => (
+                <MissionCard
+                  key={`${mission.id}-${lastUpdateTime}`}
+                  mission={mission}
+                  onShowDetail={onShowMissionDetail}
+                  isMobile={isMobile}
+                  lastUpdateTime={lastUpdateTime}
+                />
+              ))
             )}
           </>
         )}
+
       </div>
+
+      {/* 하단 버튼 영역 (flex로 배치) */}
+      {sidebarTab === 'missions' && !isLoading && (
+                  <div style={{
+            flexShrink: 0,
+            backgroundColor: 'var(--bg-secondary)',
+            borderTop: '1px solid var(--border-primary)',
+            marginBottom: "20%",
+            padding: isMobile ? 'var(--space-md)' : 'var(--space-lg)',
+            marginTop: 'auto',
+          }}>
+          <button
+            onClick={onOpenTaskModal}
+            style={{
+              width: '100%',
+              height: isMobile ? '48px' : '56px',
+              backgroundColor: 'var(--primary-color)',
+              border: 'none',
+              borderRadius: 'var(--radius-lg)',
+              color: 'white',
+              fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 'var(--space-sm)',
+              boxShadow: '0 4px 20px rgba(0, 212, 255, 0.4), 0 0 40px rgba(0, 212, 255, 0.2)'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#00b8e6';
+              e.target.style.transform = 'translateY(-2px)';
+              e.target.style.boxShadow = '0 6px 30px rgba(0, 212, 255, 0.6), 0 0 60px rgba(0, 212, 255, 0.3)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'var(--primary-color)';
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = '0 4px 20px rgba(0, 212, 255, 0.4), 0 0 40px rgba(0, 212, 255, 0.2)';
+            }}
+          >
+            <i className="fas fa-plus" style={{
+              fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-base)'
+            }}></i>
+            <span>새 작업 추가</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

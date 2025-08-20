@@ -4,6 +4,7 @@ import Sidebar from '../components/main/Sidebar';
 import MainViewOverlay from '../components/main/MainViewOverlay';
 import MapControls from '../components/main/MapControls';
 import RobotDetailModal from '../components/main/RobotDetailModal';
+import MissionDetailModal from '../components/main/MissionDetailModal';
 import TaskAddModal from '../components/main/TaskAddModal';
 import { useAppContext } from '../contexts/AppContext.jsx';
 import { calculateStats } from '../utils/mainPageUtils';
@@ -89,10 +90,14 @@ const MainPage = () => {
   const [showRobotDetail, setShowRobotDetail] = useState(false);
   const [selectedRobotDetail, setSelectedRobotDetail] = useState(null);
   
+  // 미션 상세정보 모달 상태
+  const [showMissionDetail, setShowMissionDetail] = useState(false);
+  const [selectedMissionDetail, setSelectedMissionDetail] = useState(null);
+  
   // 태스크 추가 모달 상태
   const [showTaskModal, setShowTaskModal] = useState(false);
   
-  // 로봇 상세정보 모달 핸들러 도ㅇ해물과 배산ㅣ 마고 닳ㅗㅗㄱ 하님ㅣ 모
+  // 로봇 상세정보 모달 핸들러
   const handleShowRobotDetail = (robot) => {
     setSelectedRobotDetail(robot);
     setShowRobotDetail(true);
@@ -101,6 +106,17 @@ const MainPage = () => {
   const handleCloseRobotDetail = () => {
     setShowRobotDetail(false);
     setSelectedRobotDetail(null);
+  };
+
+  // 미션 상세정보 모달 핸들러
+  const handleShowMissionDetail = (mission) => {
+    setSelectedMissionDetail(mission);
+    setShowMissionDetail(true);
+  };
+  
+  const handleCloseMissionDetail = () => {
+    setShowMissionDetail(false);
+    setSelectedMissionDetail(null);
   };
 
   // 활성 데이터
@@ -548,7 +564,7 @@ const MainPage = () => {
           transform: isMobile ? (sidebarOpen ? 'translateX(0)' : 'translateX(-100%)') : 'translateX(0)',
           transition: 'transform 0.3s ease',
           position: isMobile ? 'absolute' : 'relative',
-          height: '100%',
+          height: '100vh',
           zIndex: 1000
         }}>
           <Sidebar
@@ -558,6 +574,7 @@ const MainPage = () => {
             missions={activeMissions}
             trackedRobot={trackedRobot}
             onShowRobotDetail={handleShowRobotDetail}
+            onShowMissionDetail={handleShowMissionDetail}
             onTrackToggle={handleRobotTrack}
             isLoading={isLoading}
             isMobile={isMobile}
@@ -742,6 +759,13 @@ const MainPage = () => {
         robot={selectedRobotDetail}
         isOpen={showRobotDetail}
         onClose={handleCloseRobotDetail}
+      />
+
+      {/* 미션 상세정보 모달 */}
+      <MissionDetailModal
+        mission={selectedMissionDetail}
+        isOpen={showMissionDetail}
+        onClose={handleCloseMissionDetail}
       />
 
       {/* 태스크 추가 모달 */}

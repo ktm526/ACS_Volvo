@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getPriorityColor, getTypeIcon } from '../../utils/mainPageUtils';
 import { getStatusColor, getStatusIcon } from '../../constants';
-import MissionDetailModal from './MissionDetailModal';
 
-const MissionCard = ({ mission, isMobile = false, lastUpdateTime }) => {
+const MissionCard = ({ mission, onShowDetail, isMobile = false, lastUpdateTime }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [showModal, setShowModal] = useState(false);
   const prevMissionRef = useRef(mission);
   
   // 안전한 기본값 설정 - 백엔드 데이터 구조에 맞게 수정
@@ -163,13 +161,19 @@ const MissionCard = ({ mission, isMobile = false, lastUpdateTime }) => {
     }
   };
 
+  // 정보 영역 클릭 핸들러 (로봇 카드와 동일한 패턴)
+  const handleInfoAreaClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onShowDetail) {
+      onShowDetail(mission);
+    }
+  };
+
   return (
     <>
       <div
         style={getCardStyle()}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        onClick={() => setShowModal(true)}
       >
       {/* 우선순위 표시 바 */}
       <div style={{
@@ -384,17 +388,26 @@ const MissionCard = ({ mission, isMobile = false, lastUpdateTime }) => {
         zIndex: 1
       }} />
 
-      {/* 작업 정보 */}
-      <div style={{
-        display: isMobile ? 'flex' : 'grid',
-        flexDirection: isMobile ? 'column' : undefined,
-        gridTemplateColumns: isMobile ? undefined : '1fr auto 1fr',
-        gap: isMobile ? 'var(--space-xs)' : 'var(--space-xs)',
-        fontSize: '12px',
-        color: 'var(--text-secondary)',
-        position: 'relative',
-        zIndex: 1
-      }}>
+      {/* 미션 정보 영역 (클릭 가능) */}
+      <div 
+        onClick={handleInfoAreaClick}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={{
+          display: isMobile ? 'flex' : 'grid',
+          flexDirection: isMobile ? 'column' : undefined,
+          gridTemplateColumns: isMobile ? undefined : '1fr auto 1fr',
+          gap: isMobile ? 'var(--space-xs)' : 'var(--space-xs)',
+          fontSize: '12px',
+          color: 'var(--text-secondary)',
+          position: 'relative',
+          zIndex: 1,
+          cursor: 'pointer',
+          padding: 'var(--space-sm)',
+          margin: 'calc(-1 * var(--space-sm))',
+          borderRadius: 'var(--radius-md)',
+          transition: 'all 0.3s ease'
+        }}>
         {/* 왼쪽 컬럼 - 생성시각, 시작시각 */}
         <div style={{
           display: 'flex',
@@ -517,13 +530,45 @@ const MissionCard = ({ mission, isMobile = false, lastUpdateTime }) => {
             </span>
                     </div>
         </div>
+
+        {/* 호버 시 클릭 가이드 오버레이 */}
+        {isHovered && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(4px)',
+            borderRadius: 'var(--radius-md)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 15,
+            transition: 'all 0.3s ease'
+          }}>
+            <div style={{
+              background: 'rgba(0, 0, 0, 0.8)',
+              color: 'white',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              fontSize: isMobile ? '11px' : '12px',
+              fontWeight: '600',
+              whiteSpace: 'nowrap',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              textShadow: '0 1px 2px rgba(0, 0, 0, 0.8)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <i className="fas fa-mouse-pointer" style={{ fontSize: '12px', opacity: 0.8 }}></i>
+              클릭하여 상세 정보 조회
+            </div>
+          </div>
+        )}
       </div>
-       
-      <MissionDetailModal
-        mission={mission}
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-      />
+      </div>
     </>
   );
 };

@@ -1,16 +1,39 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { getStatusColor } from '../../constants';
 import { getRobotStatusIcon } from '../../utils/mainPageUtils';
+import { useAppContext } from '../../contexts/AppContext';
 
 const RobotDetailModal = ({ robot, isOpen, onClose }) => {
   if (!isOpen || !robot) return null;
 
+  const { state } = useAppContext();
   const statusColor = getStatusColor(robot.status, 'robot');
   const position = {
     x: robot.location_x !== undefined ? robot.location_x : 0,
     y: robot.location_y !== undefined ? robot.location_y : 0
   };
   const battery = robot.battery || robot.battery_soc || 0;
+
+  // ESC 키로 모달 닫기 + body 스크롤 방지
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      // body 스크롤 방지
+      document.body.style.overflow = 'hidden';
+      document.addEventListener('keydown', handleKeyDown);
+      
+      return () => {
+        document.body.style.overflow = 'unset';
+        document.removeEventListener('keydown', handleKeyDown);
+      };
+    }
+  }, [isOpen, onClose]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -62,9 +85,17 @@ const RobotDetailModal = ({ robot, isOpen, onClose }) => {
   };
 
   const handleOverlayClick = (e) => {
+    // 오버레이 클릭 시에만 모달 닫기 (안전한 체크)
     if (e.target === e.currentTarget) {
+      e.preventDefault();
+      e.stopPropagation();
       onClose();
     }
+  };
+
+  // 모달 내부 클릭 시 이벤트 전파 방지
+  const handleModalClick = (e) => {
+    e.stopPropagation();
   };
 
   // 정보 항목 컴포넌트
@@ -123,25 +154,27 @@ const RobotDetailModal = ({ robot, isOpen, onClose }) => {
     </div>
   );
 
-  return (
+  const modalContent = (
     <div
+      className={`app ${state.ui.theme}`}
       style={{
         position: 'fixed',
         top: 0,
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        backgroundColor: 'var(--overlay-bg)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 9999,
+        zIndex: 999999,
         backdropFilter: 'blur(3px)',
         padding: '20px'
       }}
       onClick={handleOverlayClick}
     >
       <div
+        onClick={handleModalClick}
         style={{
           backgroundColor: 'var(--bg-primary)',
           borderRadius: 'var(--radius-lg)',
@@ -150,7 +183,7 @@ const RobotDetailModal = ({ robot, isOpen, onClose }) => {
           width: '100%',
           maxHeight: '95vh',
           overflowY: 'auto',
-          boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)',
+          boxShadow: 'var(--shadow-modal)',
           border: '1px solid var(--border-primary)'
         }}
       >
@@ -202,7 +235,11 @@ const RobotDetailModal = ({ robot, isOpen, onClose }) => {
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
             style={{
               width: '32px',
               height: '32px',
@@ -433,6 +470,8 @@ const RobotDetailModal = ({ robot, isOpen, onClose }) => {
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 export default RobotDetailModal; 
