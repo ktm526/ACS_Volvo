@@ -58,7 +58,7 @@ function extractMapNameFromMetadata(metadataPath) {
     
     return null;
   } catch (error) {
-    console.error('메타데이터 파싱 오류:', error);
+
     return null;
   }
 }
@@ -66,7 +66,7 @@ function extractMapNameFromMetadata(metadataPath) {
 // 이미지 색상 변환 함수 (흰색 -> 투명, 검은색 -> 흰색)
 async function processMapImage(inputPath, outputPath) {
   try {
-    console.log('이미지 색상 변환 시작:', inputPath);
+
     
     // 이미지 정보 가져오기
     const { data, info } = await sharp(inputPath)
@@ -75,7 +75,7 @@ async function processMapImage(inputPath, outputPath) {
       .toBuffer({ resolveWithObject: true });
     
     const { width, height, channels } = info;
-    console.log('이미지 정보:', { width, height, channels });
+
     
     // 픽셀 데이터 변환
     const pixelCount = width * height;
@@ -125,11 +125,11 @@ async function processMapImage(inputPath, outputPath) {
     .png() // PNG로 저장 (투명도 지원)
     .toFile(outputPath);
     
-    console.log('이미지 색상 변환 완료:', outputPath);
+
     return true;
     
   } catch (error) {
-    console.error('이미지 색상 변환 실패:', error);
+
     return false;
   }
 }
@@ -141,7 +141,7 @@ const mapController = {
       const maps = await query('SELECT * FROM maps ORDER BY created_at DESC');
       res.json(maps);
     } catch (error) {
-      console.error('맵 목록 조회 오류:', error);
+
       res.status(500).json({ error: '맵 목록 조회 중 오류가 발생했습니다.' });
     }
   },
@@ -158,7 +158,7 @@ const mapController = {
       
       res.json(map[0]);
     } catch (error) {
-      console.error('맵 상세 조회 오류:', error);
+
       res.status(500).json({ error: '맵 상세 조회 중 오류가 발생했습니다.' });
     }
   },
@@ -177,7 +177,7 @@ const mapController = {
       // 텍스처 방식에서는 픽셀 데이터 불필요
       res.json([]);
     } catch (error) {
-      console.error('맵 픽셀 데이터 조회 오류:', error);
+
       res.status(500).json({ error: '맵 픽셀 데이터 조회 중 오류가 발생했습니다.' });
     }
   },
@@ -205,7 +205,7 @@ const mapController = {
         connections
       });
     } catch (error) {
-      console.error('맵 데이터 조회 오류:', error);
+
       res.status(500).json({ error: '맵 데이터 조회 중 오류가 발생했습니다.' });
     }
   },
@@ -246,7 +246,7 @@ const mapController = {
       const metadataContent = fs.readFileSync(metadataPath, 'utf8');
       const metadata_obj = yaml.load(metadataContent);
       
-      console.log('메타데이터 파싱 결과:', metadata_obj);
+      
       
       // 이미지 크기 정보 가져오기 (메타데이터에 없으면 실제 이미지에서 추출)
       let imageWidth = metadata_obj.width || 0;
@@ -257,9 +257,9 @@ const mapController = {
           const imageInfo = await sharp(imagePath).metadata();
           imageWidth = imageInfo.width;
           imageHeight = imageInfo.height;
-          console.log('이미지에서 추출한 크기 정보:', { width: imageWidth, height: imageHeight });
+
         } catch (error) {
-          console.error('이미지 크기 정보 추출 실패:', error);
+
         }
       }
       
@@ -289,16 +289,16 @@ const mapController = {
       let connectionCount = 0;
       
       if (nodesPath) {
-        console.log('노드 파일 처리 시작:', nodesPath);
+
         const nodesContent = fs.readFileSync(nodesPath, 'utf8');
         const nodesData = yaml.load(nodesContent);
         
-        console.log('노드 데이터 파싱 결과:', nodesData);
+
         
         if (nodesData && nodesData.node) {
-          console.log(`${nodesData.node.length}개의 노드 저장 시작`);
+
           for (const node of nodesData.node) {
-            console.log('노드 저장:', node);
+
             await query(
               `INSERT INTO map_nodes (map_id, node_index, name, position_x, position_y, type) 
                VALUES (?, ?, ?, ?, ?, ?)`,
@@ -309,7 +309,7 @@ const mapController = {
             // 각 노드의 연결 정보 처리
             if (node.connection && node.connection.length > 0) {
               for (const connectedNodeIndex of node.connection) {
-                console.log(`연결 저장: ${node.index} -> ${connectedNodeIndex}`);
+
                 await query(
                   `INSERT INTO map_connections (map_id, from_node_index, to_node_index) 
                    VALUES (?, ?, ?)`,
@@ -319,13 +319,12 @@ const mapController = {
               }
             }
           }
-          console.log(`${nodeCount}개의 노드 저장 완료`);
-          console.log(`${connectionCount}개의 연결 저장 완료`);
+
         } else {
-          console.log('노드 데이터가 없습니다 (node 키를 찾을 수 없음)');
+
         }
       } else {
-        console.log('노드 파일이 제공되지 않았습니다');
+
       }
       
       res.status(201).json({
@@ -337,7 +336,7 @@ const mapController = {
       });
       
     } catch (error) {
-      console.error('맵 생성 오류:', error);
+
       res.status(500).json({ error: '맵 생성 중 오류가 발생했습니다.' });
     }
   },
@@ -351,7 +350,7 @@ const mapController = {
       await query('UPDATE maps SET name = ? WHERE id = ?', [name, id]);
       res.json({ message: '맵이 성공적으로 수정되었습니다.' });
     } catch (error) {
-      console.error('맵 수정 오류:', error);
+
       res.status(500).json({ error: '맵 수정 중 오류가 발생했습니다.' });
     }
   },
@@ -386,7 +385,7 @@ const mapController = {
       
       res.json({ message: '맵이 성공적으로 삭제되었습니다.' });
     } catch (error) {
-      console.error('맵 삭제 오류:', error);
+
       res.status(500).json({ error: '맵 삭제 중 오류가 발생했습니다.' });
     }
   },
@@ -396,21 +395,16 @@ const mapController = {
     try {
       const { id, fileType } = req.params;
       
-      console.log(`파일 다운로드 요청: id=${id}, fileType=${fileType}`);
+  
       
       const map = await query('SELECT * FROM maps WHERE id = ?', [id]);
       if (map.length === 0) {
-        console.log(`맵을 찾을 수 없음: id=${id}`);
+
         return res.status(404).json({ error: '맵을 찾을 수 없습니다.' });
       }
       
       const mapData = map[0];
-      console.log('맵 데이터:', { 
-        name: mapData.name, 
-        image_path: mapData.image_path,
-        metadata_path: mapData.metadata_path,
-        nodes_path: mapData.nodes_path
-      });
+
       
       let filePath;
       
@@ -425,22 +419,21 @@ const mapController = {
           filePath = mapData.nodes_path;
           break;
         default:
-          console.log(`잘못된 파일 타입: ${fileType}`);
+
           return res.status(400).json({ error: '잘못된 파일 타입입니다.' });
       }
       
-      console.log(`파일 경로: ${filePath}`);
-      console.log(`파일 존재 여부: ${fs.existsSync(filePath)}`);
+
       
       if (!filePath || !fs.existsSync(filePath)) {
-        console.log(`파일을 찾을 수 없음: ${filePath}`);
+
         return res.status(404).json({ error: '파일을 찾을 수 없습니다.' });
       }
       
-      console.log(`파일 전송 시작: ${filePath}`);
+
       res.sendFile(path.resolve(filePath));
     } catch (error) {
-      console.error('파일 다운로드 오류:', error);
+
       res.status(500).json({ error: '파일 다운로드 중 오류가 발생했습니다.' });
     }
   }

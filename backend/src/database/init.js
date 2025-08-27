@@ -42,15 +42,21 @@ const initializeDatabase = () => {
           amr_timestamp TEXT,
           
           last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
-          last_status_check DATETIME DEFAULT CURRENT_TIMESTAMP
+          last_status_check DATETIME DEFAULT CURRENT_TIMESTAMP,
+          
+          -- 태스크 관리 관련 필드들
+          current_waypoint_index INTEGER DEFAULT 0,
+          task_status TEXT DEFAULT 'idle',
+          destination_node_id TEXT,
+          last_command_sent DATETIME
         )
       `, (err) => {
         if (err) {
-          console.error('로봇 테이블 생성 에러:', err.message);
+          
           reject(err);
           return;
         }
-        console.log('로봇 테이블 확인 완료');
+        
       });
 
       // 기존 robots 테이블에 새 컬럼들 추가 (이미 테이블이 존재하는 경우)
@@ -75,14 +81,19 @@ const initializeDatabase = () => {
         'ALTER TABLE robots ADD COLUMN error_code INTEGER DEFAULT 0',
         'ALTER TABLE robots ADD COLUMN error_msg TEXT',
         'ALTER TABLE robots ADD COLUMN amr_timestamp TEXT',
-        'ALTER TABLE robots ADD COLUMN last_status_check DATETIME DEFAULT CURRENT_TIMESTAMP'
+        'ALTER TABLE robots ADD COLUMN last_status_check DATETIME DEFAULT CURRENT_TIMESTAMP',
+        // 태스크 관리 관련 컬럼들
+        'ALTER TABLE robots ADD COLUMN current_waypoint_index INTEGER DEFAULT 0',
+        'ALTER TABLE robots ADD COLUMN task_status TEXT DEFAULT \'idle\'',
+        'ALTER TABLE robots ADD COLUMN destination_node_id TEXT',
+        'ALTER TABLE robots ADD COLUMN last_command_sent DATETIME'
       ];
 
       // 각 컬럼을 순차적으로 추가 (이미 존재하면 에러 무시)
       newColumns.forEach(sql => {
         db.run(sql, (err) => {
           if (err && !err.message.includes('duplicate column name')) {
-            console.error('컬럼 추가 에러:', err.message);
+
           }
         });
       });
@@ -109,11 +120,11 @@ const initializeDatabase = () => {
         )
       `, (err) => {
         if (err) {
-          console.error('맵 테이블 생성 에러:', err.message);
+          
           reject(err);
           return;
         }
-        console.log('맵 테이블 확인 완료');
+        
       });
 
       // 맵 노드 테이블
@@ -132,11 +143,11 @@ const initializeDatabase = () => {
         )
       `, (err) => {
         if (err) {
-          console.error('맵 노드 테이블 생성 에러:', err.message);
+          
           reject(err);
           return;
         }
-        console.log('맵 노드 테이블 확인 완료');
+        
       });
 
       // 맵 연결 테이블
@@ -150,11 +161,11 @@ const initializeDatabase = () => {
         )
       `, (err) => {
         if (err) {
-          console.error('맵 연결 테이블 생성 에러:', err.message);
+          
           reject(err);
           return;
         }
-        console.log('맵 연결 테이블 확인 완료');
+        
       });
 
       // 맵 픽셀 데이터 테이블 (이미지의 검은 픽셀 좌표)
@@ -168,11 +179,11 @@ const initializeDatabase = () => {
         )
       `, (err) => {
         if (err) {
-          console.error('맵 픽셀 테이블 생성 에러:', err.message);
+          
           reject(err);
           return;
         }
-        console.log('맵 픽셀 테이블 확인 완료');
+        
       });
 
       // 픽셀 데이터 조회 성능 향상을 위한 인덱스
@@ -180,11 +191,11 @@ const initializeDatabase = () => {
         CREATE INDEX IF NOT EXISTS idx_map_pixels_map_id ON map_pixels(map_id);
       `, (err) => {
         if (err) {
-          console.error('맵 픽셀 인덱스 생성 에러:', err.message);
+          
           reject(err);
           return;
         }
-        console.log('맵 픽셀 인덱스 확인 완료');
+        
       });
 
       // 임무 테이블
@@ -207,12 +218,12 @@ const initializeDatabase = () => {
         )
       `, (err) => {
         if (err) {
-          console.error('임무 테이블 생성 에러:', err.message);
+          
           reject(err);
           return;
         }
-        console.log('임무 테이블 확인 완료');
-        console.log('데이터베이스 테이블 확인 완료');
+        
+        
         resolve();
       });
     });

@@ -1,0 +1,101 @@
+# type : (home,0) (main,1) (path,2) (coverage,3)
+node:
+  - name: "child1"
+    type: 3
+    index: 1001
+    connection: []
+    child: []
+    data: 2
+    position:
+      x: 3.00
+      y: 4.00
+      yaw: 0.00
+
+  - name: "child2"
+    type: 3
+    index: 1002
+    connection: []
+    child: []
+    data: 2
+    position:
+      x: 6.50
+      y: 4.00
+      yaw: 0.00
+
+  - name: "child3"
+    type: 3
+    index: 1003
+    connection: []
+    child: []
+    data: 2
+    position:
+      x: 6.50
+      y: 1.00
+      yaw: 0.00
+
+  - name: "child4"
+    type: 3
+    index: 1004
+    connection: []
+    child: []
+    data: 2
+    position:
+      x: 4.00
+      y: 1.00
+      yaw: 0.00
+
+  - name: "path1"
+    type: 2
+    index: 1
+    connection: [2, 777]
+    child: []
+    data: 0
+    position:
+      x: -1.00
+      y: 4.00
+      yaw: 0.00
+
+  - name: "path2"
+    type: 2
+    index: 2
+    connection: [1, 3]
+    child: []
+    data: 0
+    position:
+      x: -1.00
+      y: 0.40
+      yaw: 0.00
+
+  - name: "path3"
+    type: 2
+    index: 3
+    connection: [2, 101]
+    child: []
+    data: 0
+    position:
+      x: 3.00
+      y: 0.40
+      yaw: 0.00
+
+  - name: "test_room"
+    type: 1
+    index: 101
+    connection: [3]
+    child: [1001, 1002, 1003, 1004]
+    data: 0
+    position:
+      x: 3.00
+      y: 2.00
+      yaw: 0.00
+
+  - name: "home"
+    type: 0
+    index: 777
+    connection: [1]
+    child: []
+    data: 0
+    position:
+      x: -3.00
+      y: 4.00
+      yaw: 0.00
+

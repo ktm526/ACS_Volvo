@@ -10,7 +10,7 @@ const dbConfig = config[env];
 const dbDir = path.dirname(dbConfig.database);
 if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
-  console.log('DB 디렉토리를 생성했습니다:', dbDir);
+  
 }
 
 let db = null;
@@ -24,10 +24,10 @@ const connect = () => {
 
     db = new sqlite3.Database(dbConfig.database, (err) => {
       if (err) {
-        console.error('데이터베이스 연결 에러:', err.message);
+        
         reject(err);
       } else {
-        console.log('SQLite 데이터베이스에 연결되었습니다');
+        
         resolve(db);
       }
     });
@@ -49,7 +49,7 @@ const close = () => {
           reject(err);
         } else {
           db = null;
-          console.log('데이터베이스 연결이 종료되었습니다');
+          
           resolve();
         }
       });

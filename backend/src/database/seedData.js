@@ -7,7 +7,7 @@ const seedRobots = () => {
     // 초기 로봇 데이터 삽입
     db.get('SELECT COUNT(*) as count FROM robots', [], (err, row) => {
       if (err) {
-        console.error('로봇 데이터 확인 에러:', err.message);
+        
         reject(err);
         return;
       }
@@ -31,18 +31,18 @@ const seedRobots = () => {
             [robot.name, robot.ip_address, robot.status, robot.battery, robot.location_x, robot.location_y],
             function(err) {
               if (err && !hasError) {
-                console.error('로봇 데이터 추가 에러:', err.message);
+                
                 hasError = true;
                 reject(err);
                 return;
               }
               
               if (!hasError) {
-                console.log(`로봇 추가됨: ${robot.name} (ID: ${this.lastID})`);
+                
                 completed++;
                 
                 if (completed === robots.length) {
-                  console.log('초기 로봇 데이터 삽입 완료');
+                  
                   resolve();
                 }
               }
@@ -50,7 +50,7 @@ const seedRobots = () => {
           );
         });
       } else {
-        console.log('로봇 데이터가 이미 존재합니다');
+        
         resolve();
       }
     });
@@ -60,9 +60,9 @@ const seedRobots = () => {
 const seedAll = async () => {
   try {
     await seedRobots();
-    console.log('모든 시드 데이터 삽입 완료');
+    
   } catch (error) {
-    console.error('시드 데이터 삽입 실패:', error);
+    
     throw error;
   }
 };

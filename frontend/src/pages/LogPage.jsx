@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useRobots } from '../hooks/useRobots';
 import { useMissions } from '../hooks/useMissions';
-import FilterSection from '../components/log/FilterSection';
-import StatsDashboard from '../components/log/StatsDashboard';
-import RobotWorkTimeChart from '../components/log/RobotWorkTimeChart';
-import RobotTaskCountChart from '../components/log/RobotTaskCountChart';
-import RobotTaskTimeline from '../components/log/RobotTaskTimeline';
-import ActivityLogList from '../components/log/ActivityLogList';
+import TabComponent from '../components/log/TabComponent';
+import DashboardTab from '../components/log/DashboardTab';
+import LogTab from '../components/log/LogTab';
 
 const LogPage = () => {
   const { robots } = useRobots();
@@ -14,6 +11,7 @@ const LogPage = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedLogs, setExpandedLogs] = useState(new Set());
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [filters, setFilters] = useState({
     level: 'all',
     category: 'all',
@@ -257,66 +255,56 @@ const LogPage = () => {
     });
   };
 
+  // 탭 설정
+  const tabs = [
+    { id: 'dashboard', label: '대시보드', icon: 'fas fa-chart-bar' },
+    { id: 'logs', label: '로그', icon: 'fas fa-list-alt' }
+  ];
+
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+  
   return (
     <div style={{
       width: '100%',
       height: '100%',
-      padding: 'var(--space-xl)',
+      padding: isMobile ? 'var(--space-md)' : 'var(--space-xl)',
       backgroundColor: 'var(--bg-primary)',
       color: 'var(--text-primary)',
       fontFamily: 'Pretendard, sans-serif',
       overflow: 'auto'
     }}>
-      {/* 1. 필터 섹션 - 최상단 */}
-      <FilterSection 
-        filters={filters}
-        onFilterChange={handleFilterChange}
-        uniqueRobots={uniqueRobots}
+      {/* 탭 컴포넌트 */}
+      <TabComponent 
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        tabs={tabs}
       />
 
-      {/* 2. 통계 섹션 - 2x2 통계 + 로봇별 통계 */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: '0.6fr 1.4fr', 
-        gap: 'var(--space-xl)', 
-        marginBottom: 'var(--space-xl)' 
-      }}>
-        {/* 왼쪽: 2x2 통계 대시보드 */}
-        <StatsDashboard 
+      {/* 탭 내용 */}
+      {activeTab === 'dashboard' && (
+        <DashboardTab 
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          uniqueRobots={uniqueRobots}
           stats={stats}
           formatDuration={formatDuration}
+          robotWorkTime={robotWorkTime}
+          robotTaskCount={robotTaskCount}
         />
+      )}
 
-        {/* 오른쪽: 로봇별 통계 */}
-            <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: '1fr 1fr', 
-          gap: 'var(--space-md)' 
-        }}>
-          <RobotWorkTimeChart 
-            robotWorkTime={robotWorkTime}
-            formatDuration={formatDuration}
-          />
-          <RobotTaskCountChart 
-            robotTaskCount={robotTaskCount}
-          />
-        </div>
-      </div>
-
-      {/* 4. 태스크 타임라인 - 별도 섹션 */}
-      <div style={{ marginBottom: 'var(--space-xl)' }}>
-        <RobotTaskTimeline />
-      </div>
-
-      {/* 5. 활동 로그 - 하단 */}
-      <ActivityLogList 
-        filteredLogs={filteredLogs}
-        expandedLogs={expandedLogs}
-        onToggleExpansion={toggleLogExpansion}
-        getLevelColor={getLevelColor}
-        getLevelIcon={getLevelIcon}
-        formatDuration={formatDuration}
-      />
+      {activeTab === 'logs' && (
+        <LogTab 
+          filteredLogs={filteredLogs}
+          expandedLogs={expandedLogs}
+          onToggleExpansion={toggleLogExpansion}
+          getLevelColor={getLevelColor}
+          getLevelIcon={getLevelIcon}
+          formatDuration={formatDuration}
+          filters={filters}
+          onFilterChange={handleFilterChange}
+        />
+      )}
     </div>
   );
 };

@@ -11,7 +11,9 @@ function CameraController({ viewMode, zoomLevel, trackedRobot, duration = 1.0, i
   const { camera, controls } = useThree();
   const animationRef = useRef(null);
   const lastConfig = useRef({ viewMode: null, zoomLevel: null, trackedRobot: null });
+  const lastTrackedPosition = useRef({ x: 0, y: 0 });
   const initialStateApplied = useRef(false);
+  const isTrackingMode = useRef(false);
 
   useEffect(() => {
     if (!controls) return;
@@ -25,13 +27,24 @@ function CameraController({ viewMode, zoomLevel, trackedRobot, duration = 1.0, i
       return () => clearTimeout(timer);
     }
 
+    // 추적 모드 상태 업데이트
+    const wasTrackingMode = isTrackingMode.current;
+    isTrackingMode.current = !!trackedRobot;
+
     // 설정이 변경되었는지 확인
     const configChanged = 
       lastConfig.current.viewMode !== viewMode ||
       lastConfig.current.zoomLevel !== zoomLevel ||
       lastConfig.current.trackedRobot !== trackedRobot?.id;
 
-    if (!configChanged) return;
+    // 추적 중인 로봇의 위치가 변경되었는지 확인
+    const robotPositionChanged = trackedRobot && (
+      Math.abs(lastTrackedPosition.current.x - (trackedRobot.location_x || 0)) > 0.1 ||
+      Math.abs(lastTrackedPosition.current.y - (trackedRobot.location_y || 0)) > 0.1
+    );
+
+    // 추적 모드가 시작되거나 설정이 변경되거나 로봇 위치가 변경된 경우에만 애니메이션 실행
+    if (!configChanged && !robotPositionChanged) return;
 
     // 이전 애니메이션 취소
     if (animationRef.current) {
@@ -51,8 +64,8 @@ function CameraController({ viewMode, zoomLevel, trackedRobot, duration = 1.0, i
     // 목표 설정 계산
     let targetDistance, targetPolar, targetAzimuth, targetTarget;
 
-    // 줌 레벨에 따른 거리 계산 (8~50 범위) - 맵 데이터에 맞게 조정
-    targetDistance = 8 + (3 - zoomLevel) * 17; // zoomLevel 3일 때 8, 0.5일 때 50.5
+    // 줌 레벨에 따른 거리 계산 (3~100 범위) - 포인트클라우드 전체 보기 위해 확장
+    targetDistance = 3 + (3 - zoomLevel) * 35; // zoomLevel 3일 때 3, 0.5일 때 90.5
 
     // 뷰 모드에 따른 극각 계산
     if (viewMode === 'overview') {
@@ -63,11 +76,14 @@ function CameraController({ viewMode, zoomLevel, trackedRobot, duration = 1.0, i
 
     // 로봇 추적 여부에 따른 타겟과 방위각 설정
     if (trackedRobot) {
-      targetTarget = new THREE.Vector3(
-        trackedRobot.location_x || 0, 
-        0, 
-        trackedRobot.location_y || 0
-      );
+      const robotX = trackedRobot.location_x || 0;
+      const robotY = trackedRobot.location_y || 0;
+      
+      targetTarget = new THREE.Vector3(robotX, 0, -robotY); // Z축 반전 (Three.js 좌표계)
+      
+      // 추적된 로봇의 위치 업데이트
+      lastTrackedPosition.current = { x: robotX, y: robotY };
+      
       // 추적 모드에서는 현재 방위각 유지 (부드러운 추적)
       targetAzimuth = currentAzimuth;
     } else {
@@ -76,13 +92,18 @@ function CameraController({ viewMode, zoomLevel, trackedRobot, duration = 1.0, i
       targetAzimuth = 0; // 0도 (정면)
     }
 
-    console.log('Camera smooth transition:', { 
-      viewMode, 
-      zoomLevel,
-      targetDistance,
-      targetPolar: (targetPolar * 180 / Math.PI).toFixed(1) + '°',
-      trackedRobot: trackedRobot?.id
-    });
+    // 추적 모드에서는 더 빠른 애니메이션 (로봇 위치 변경 시)
+    const animationDuration = robotPositionChanged && trackedRobot ? 0.5 : duration;
+
+    // console.log('Camera smooth transition:', { 
+    //   viewMode, 
+    //   zoomLevel,
+    //   targetDistance,
+    //   targetPolar: (targetPolar * 180 / Math.PI).toFixed(1) + '°',
+    //   trackedRobot: trackedRobot?.id,
+    //   robotPositionChanged,
+    //   animationDuration
+    // });
 
     // 애니메이션 시작값
     const startDistance = currentDistance;
@@ -93,7 +114,7 @@ function CameraController({ viewMode, zoomLevel, trackedRobot, duration = 1.0, i
 
     const animate = () => {
       const elapsed = (Date.now() - startTime) / 1000;
-      const progress = Math.min(elapsed / duration, 1);
+      const progress = Math.min(elapsed / animationDuration, 1);
 
       // 부드러운 easing (더 자연스러운 곡선)
       const easeProgress = progress < 0.5 
@@ -122,7 +143,7 @@ function CameraController({ viewMode, zoomLevel, trackedRobot, duration = 1.0, i
         animationRef.current = requestAnimationFrame(animate);
       } else {
         animationRef.current = null;
-        console.log('Camera transition completed');
+        //console.log('Camera transition completed');
       }
     };
 
@@ -140,7 +161,7 @@ function CameraController({ viewMode, zoomLevel, trackedRobot, duration = 1.0, i
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [viewMode, zoomLevel, trackedRobot, camera, controls, duration]);
+  }, [viewMode, zoomLevel, trackedRobot, trackedRobot?.location_x, trackedRobot?.location_y, camera, controls, duration]);
 
   return null;
 }
@@ -165,7 +186,7 @@ function CameraStateTracker({ initialCameraState, onCameraStateChange }) {
       // 컨트롤 업데이트
       controls.update();
       
-      console.log('Camera state restored:', { position, target });
+      //console.log('Camera state restored:', { position, target });
     }
   }, [initialCameraState, camera, controls]);
 
@@ -234,8 +255,14 @@ function Robot({ robot, colors, isSelected = false, onHover, onHoverEnd, theme }
   const meshRef = useRef();
   const pulseRef = useRef();
   const pulseRef2 = useRef();
+  const groupRef = useRef(); // 그룹 참조 추가
   const { camera, gl } = useThree();
   const [isHovered, setIsHovered] = useState(false);
+  
+  // 부드러운 이동을 위한 상태
+  const currentPos = useRef({ x: robot.location_x || 0, y: robot.location_y || 0 });
+  const targetPos = useRef({ x: robot.location_x || 0, y: robot.location_y || 0 });
+  const lastUpdateTime = useRef(Date.now());
   
   // RobotCard와 동일한 상태 색상 매핑 사용
   const statusColor = getStatusColor(robot.status, 'robot');
@@ -272,28 +299,64 @@ function Robot({ robot, colors, isSelected = false, onHover, onHoverEnd, theme }
 
   const robotDirection = calculateDirection();
 
+  // 새로운 위치 데이터가 들어올 때 목표 위치 업데이트
+  useEffect(() => {
+    const newX = robot.location_x || 0;
+    const newY = robot.location_y || 0;
+    
+    // 위치가 실제로 변경되었을 때만 업데이트 (더 민감하게)
+    if (Math.abs(targetPos.current.x - newX) > 0.005 || Math.abs(targetPos.current.y - newY) > 0.005) {
+      targetPos.current = { x: newX, y: newY };
+      lastUpdateTime.current = Date.now();
+      
+      // console.log(`🎯 로봇 ${robot.id} 목표 위치 업데이트:`, {
+      //   from: { x: currentPos.current.x, y: currentPos.current.y },
+      //   to: { x: newX, y: newY }
+      // });
+    }
+  }, [robot.location_x, robot.location_y, robot.id]);
+
   // 디버깅: 로봇 데이터 확인 (위치가 0,0이 아닌 경우만)
   if (robot.location_x !== 0 || robot.location_y !== 0) {
-    console.log('✅ Robot 컴포넌트 - 로봇 위치 데이터 확인:', {
-      id: robot.id,
-      name: robot.name,
-      location_x: robot.location_x,
-      location_y: robot.location_y,
-      angle: robot.angle,
-      원본_각도_도수: robot.angle ? (robot.angle * 180 / Math.PI).toFixed(1) + '°' : 'N/A',
-      보정된_방향_도수: (robotDirection * 180 / Math.PI).toFixed(1) + '°'
-    });
+    // console.log('✅ Robot 컴포넌트 - 로봇 위치 데이터 확인:', {
+    //   id: robot.id,
+    //   name: robot.name,
+    //   location_x: robot.location_x,
+    //   location_y: robot.location_y,
+    //   angle: robot.angle,
+    //   원본_각도_도수: robot.angle ? (robot.angle * 180 / Math.PI).toFixed(1) + '°' : 'N/A',
+    //   보정된_방향_도수: (robotDirection * 180 / Math.PI).toFixed(1) + '°'
+    // });
   } else {
-    console.log('❌ Robot 컴포넌트 - 로봇 위치가 0,0입니다:', {
-      id: robot.id,
-      name: robot.name,
-      전체_데이터: robot
-    });
+    // console.log('❌ Robot 컴포넌트 - 로봇 위치가 0,0입니다:', {
+    //   id: robot.id,
+    //   name: robot.name,
+    //   전체_데이터: robot
+    // });
   }
 
-  // 레이더 스캔 효과
+  // 부드러운 위치 보간 및 레이더 스캔 효과
   useFrame((state) => {
     const time = state.clock.elapsedTime;
+    
+    // 부드러운 위치 보간 (Lerp) - 더 부드럽게
+    const lerpSpeed = robot.status === 'moving' ? 0.05 : 0.02; // 이동 중일 때도 부드럽게
+    const distance = Math.sqrt(
+      Math.pow(targetPos.current.x - currentPos.current.x, 2) + 
+      Math.pow(targetPos.current.y - currentPos.current.y, 2)
+    );
+    
+    // 거리가 충분히 클 때만 보간 적용 (더 민감하게)
+    if (distance > 0.0005) {
+      currentPos.current.x += (targetPos.current.x - currentPos.current.x) * lerpSpeed;
+      currentPos.current.y += (targetPos.current.y - currentPos.current.y) * lerpSpeed;
+      
+      // 그룹 위치 업데이트
+      if (groupRef.current) {
+        groupRef.current.position.x = currentPos.current.x;
+        groupRef.current.position.z = -currentPos.current.y;
+      }
+    }
     
     if (pulseRef.current) {
       const wave1Progress = (time * 1.5) % 3;
@@ -353,14 +416,14 @@ function Robot({ robot, colors, isSelected = false, onHover, onHoverEnd, theme }
     setIsHovered(false);
   }, [robot.id]);
   
-  // 안전한 위치 값 사용
+  // 초기 위치 설정 (첫 렌더링용)
   const robotX = robot.location_x !== undefined ? robot.location_x : 0;
   const robotY = robot.location_y !== undefined ? robot.location_y : 0;
   
-  console.log('Robot 컴포넌트 - 최종 위치:', { robotX, robotY });
+  //console.log('Robot 컴포넌트 - 초기 위치:', { robotX, robotY });
 
   return (
-    <group position={[robotX, 0.1, -robotY]}>
+    <group ref={groupRef} position={[robotX, 0.1, -robotY]}>
       {/* 펄스 링들 */}
       <group rotation={[-Math.PI / 2, 0, robotDirection]}>
         <mesh 
@@ -431,7 +494,7 @@ function Robot({ robot, colors, isSelected = false, onHover, onHoverEnd, theme }
       {/* 로봇 툴팁 (3D 공간에 고정) */}
       {isHovered && (
         <Html 
-          position={[robotX, 1.2, -robotY]}
+          position={[currentPos.current.x, 1.2, -currentPos.current.y]}
           center
           style={{
             transform: 'translate(-50%, -100%)',
@@ -485,19 +548,19 @@ function RobotTooltip({ robot, statusColor, theme = 'dark' }) {
 
   // 디버깅: 툴팁에서 위치 데이터 확인 (호버 시에만)
   if (safeLocationX !== 0 || safeLocationY !== 0) {
-    console.log('✅ RobotTooltip - 위치 데이터 정상:', {
-      원본_location_x: robot.location_x,
-      원본_location_y: robot.location_y,
-      최종_표시_위치: { x: safeLocationX, y: safeLocationY }
-    });
+    // console.log('✅ RobotTooltip - 위치 데이터 정상:', {
+    //   원본_location_x: robot.location_x,
+    //   원본_location_y: robot.location_y,
+    //   최종_표시_위치: { x: safeLocationX, y: safeLocationY }
+    // });
   } else {
-    console.log('❌ RobotTooltip - 위치 데이터가 0,0:', {
-      원본_location_x: robot.location_x,
-      원본_location_y: robot.location_y,
-      타입_원본_x: typeof robot.location_x,
-      타입_원본_y: typeof robot.location_y,
-      전체_로봇_데이터: robot
-    });
+    // console.log('❌ RobotTooltip - 위치 데이터가 0,0:', {
+    //   원본_location_x: robot.location_x,
+    //   원본_location_y: robot.location_y,
+    //   타입_원본_x: typeof robot.location_x,
+    //   타입_원본_y: typeof robot.location_y,
+    //   전체_로봇_데이터: robot
+    // });
   }
 
   return (
@@ -720,7 +783,9 @@ const Scene3D = ({
   showMapData = false,
   initialCameraState = null,
   onCameraStateChange = null,
-  onMoveRequest = null
+  onMoveRequest = null,
+  pcdData = null,
+  showPointCloud = false
 }) => {
   const { state } = useAppContext();
   
@@ -734,14 +799,14 @@ const Scene3D = ({
   const trackedRobotData = activeRobots.find(robot => robot.id === trackedRobot);
   
   useEffect(() => {
-    console.log('Scene3D props updated:', { 
-      viewMode, 
-      zoomLevel, 
-      trackedRobot: trackedRobotData?.id,
-      showMapData,
-      mapData: mapData ? { id: mapData.map?.id, name: mapData.map?.name } : null,
-      robotsCount: activeRobots.length
-    });
+    // console.log('Scene3D props updated:', { 
+    //   viewMode, 
+    //   zoomLevel, 
+    //   trackedRobot: trackedRobotData?.id,
+    //   showMapData,
+    //   mapData: mapData ? { id: mapData.map?.id, name: mapData.map?.name } : null,
+    //   robotsCount: activeRobots.length
+    // });
   }, [viewMode, zoomLevel, trackedRobotData, showMapData, mapData, activeRobots.length]);
 
   const handleRobotHover = useCallback((robot) => {
@@ -801,6 +866,8 @@ const Scene3D = ({
             onNodeHoverEnd={null}
             robots={activeRobots}
             onMoveRequest={handleMoveRequest}
+            pcdData={pcdData}
+            showPointCloud={showPointCloud}
           />
         )}
 
@@ -840,15 +907,15 @@ const Scene3D = ({
         <OrbitControls 
           enableDamping={true}
           dampingFactor={0.05}
-          minDistance={10}
-          maxDistance={120}
+          minDistance={2}
+          maxDistance={200}
           maxPolarAngle={Math.PI / 2.2}
           minPolarAngle={0}
           enableRotate={true}
           enableZoom={true}
           enablePan={!trackedRobotData}
           rotateSpeed={0.6}
-          zoomSpeed={1.0}
+          zoomSpeed={1.5}
           panSpeed={0.8}
           screenSpacePanning={false}
           makeDefault={true}

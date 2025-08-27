@@ -8,7 +8,7 @@ import MissionDetailModal from '../components/main/MissionDetailModal';
 import TaskAddModal from '../components/main/TaskAddModal';
 import { useAppContext } from '../contexts/AppContext.jsx';
 import { calculateStats } from '../utils/mainPageUtils';
-import { robotsAPI } from '../services/api';
+import { robotsAPI, pcdAPI } from '../services/api';
 
 const MainPage = () => {
   const { state, actions } = useAppContext();
@@ -78,6 +78,13 @@ const MainPage = () => {
   const [currentMapData, setCurrentMapData] = useState(null);
   const [mapLoading, setMapLoading] = useState(false);
   
+  // PCD 포인트클라우드 관련 상태
+  const [pcdData, setPcdData] = useState(null);
+  const [showPointCloud, setShowPointCloud] = useState(false);
+  const [pcdUploading, setPcdUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [pcdProcessedData, setPcdProcessedData] = useState(null);
+  
   // 최소 로딩 시간 보장을 위한 상태
   const [minLoadingComplete, setMinLoadingComplete] = useState(false);
   const [dataLoadingComplete, setDataLoadingComplete] = useState(false);
@@ -119,6 +126,13 @@ const MainPage = () => {
     setSelectedMissionDetail(null);
   };
 
+  // 미션 업데이트 핸들러
+  const handleMissionUpdate = () => {
+
+    loadMissions();
+    loadRobots(); // 로봇 상태도 함께 업데이트 (미션 취소 시 로봇 상태도 변경됨)
+  };
+
   // 활성 데이터
   const activeRobots = robots || [];
   const activeMissions = missions || [];
@@ -133,25 +147,17 @@ const MainPage = () => {
   const loadRobots = async () => {
     try {
       setLoading(prev => ({ ...prev, robots: true }));
-      console.log('로봇 데이터 로딩 시작:', `${API_URL}/api/robots`);
+
       
       const response = await fetch(`${API_URL}/api/robots`);
-      console.log('로봇 API 응답 상태:', response.status);
+
       
       const data = await response.json();
-      console.log('로봇 API 응답 데이터:', data);
+
       
       if (response.ok) {
         const robotsData = data.data || [];
-        console.log('설정된 로봇 데이터:', robotsData);
-        console.log('첫 번째 로봇 위치 정보:', robotsData[0] ? {
-          id: robotsData[0].id,
-          name: robotsData[0].name,
-          location_x: robotsData[0].location_x,
-          location_y: robotsData[0].location_y,
-          타입_x: typeof robotsData[0].location_x,
-          타입_y: typeof robotsData[0].location_y
-        } : 'No robots');
+
         setRobots(robotsData);
         // AppContext에도 업데이트
         actions.setRobots(robotsData);
@@ -177,17 +183,17 @@ const MainPage = () => {
   const loadMissions = async () => {
     try {
       setLoading(prev => ({ ...prev, missions: true }));
-      console.log('미션 데이터 로딩 시작:', `${API_URL}/api/missions`);
+
       
       const response = await fetch(`${API_URL}/api/missions`);
-      console.log('미션 API 응답 상태:', response.status);
+
       
       const data = await response.json();
-      console.log('미션 API 응답 데이터:', data);
+
       
       if (response.ok) {
         const missionsData = data.data || [];
-        console.log('설정된 미션 데이터:', missionsData);
+
         setMissions(missionsData);
       } else {
         console.error('미션 API 에러:', data);
@@ -203,23 +209,23 @@ const MainPage = () => {
 
   // 맵 목록 가져오기
   const fetchAvailableMaps = async () => {
-    console.log('fetchAvailableMaps: 맵 목록 가져오기 시작');
+
     
     try {
       const url = `${API_URL}/api/maps`;
-      console.log('fetchAvailableMaps: API 호출', url);
+
       
       const response = await fetch(url);
-      console.log('fetchAvailableMaps: 응답 상태', response.status);
+
       
       if (response.ok) {
         const maps = await response.json();
-        console.log('fetchAvailableMaps: 맵 목록 로드 완료:', maps);
+
         setAvailableMaps(maps);
         
         // 첫 번째 맵을 기본 선택
         if (maps.length > 0 && !selectedMap) {
-          console.log('fetchAvailableMaps: 첫 번째 맵 선택:', maps[0]);
+
           setSelectedMap(maps[0]);
         }
       } else {
@@ -235,23 +241,23 @@ const MainPage = () => {
   // 맵 데이터 가져오기
   const fetchMapData = async (mapId) => {
     if (!mapId) {
-      console.log('fetchMapData: mapId가 없음');
+
       return;
     }
     
-    console.log('fetchMapData: 맵 데이터 가져오기 시작', mapId);
+
     
     try {
       setMapLoading(true);
       const url = `${API_URL}/api/maps/${mapId}/data?sample=1&limit=999999`;
-      console.log('fetchMapData: API 호출', url);
+
       
       const response = await fetch(url);
-      console.log('fetchMapData: 응답 상태', response.status);
+
       
       if (response.ok) {
         const mapData = await response.json();
-        console.log('fetchMapData: 맵 데이터 로드 완료:', mapData);
+
         setCurrentMapData(mapData);
       } else {
         console.error('fetchMapData: 맵 데이터를 가져오는데 실패했습니다', response.status, response.statusText);
@@ -289,7 +295,7 @@ const MainPage = () => {
 
   // 카메라 상태 변경 및 저장 핸들러
   const handleViewModeChange = (newViewMode) => {
-    console.log('View mode change:', viewMode, '->', newViewMode);
+
     setViewMode(newViewMode);
     
     // 카메라 상태 저장
@@ -304,7 +310,7 @@ const MainPage = () => {
   };
 
   const handleZoomChange = (newZoomLevel) => {
-    console.log('Zoom change:', zoomLevel, '->', newZoomLevel);
+
     setZoomLevel(newZoomLevel);
     
     // 카메라 상태 저장
@@ -319,7 +325,7 @@ const MainPage = () => {
   };
 
   const handleRobotTrack = (robotId) => {
-    console.log('Robot track change:', trackedRobot, '->', robotId);
+
     setTrackedRobot(robotId);
   };
 
@@ -354,14 +360,15 @@ const MainPage = () => {
     fetchAvailableMaps();
   }, []);
 
-  // 실시간 데이터 업데이트 (3초마다)
+  // 실시간 데이터 업데이트 (500ms마다)
   useEffect(() => {
     if (!liveDataEnabled) return;
 
     const interval = setInterval(() => {
-      console.log('🔄 실시간 로봇 데이터 업데이트 중...');
+
       loadRobots();
-    }, 3000); // 3초마다 업데이트
+      loadMissions(); // 미션 데이터도 함께 업데이트
+    }, 500);
 
     return () => clearInterval(interval);
   }, [liveDataEnabled]);
@@ -460,11 +467,11 @@ const MainPage = () => {
   // AMR 이동 요청 핸들러
   const handleMoveRequest = async (robotId, nodeId) => {
     try {
-      console.log('AMR 이동 요청:', { robotId, nodeId });
+
       
       // API 호출
       const result = await robotsAPI.requestMove(robotId, nodeId);
-      console.log('AMR 이동 요청 성공:', result);
+
       
       // 알림 표시
       if (actions.addNotification) {
@@ -490,6 +497,119 @@ const MainPage = () => {
         });
       }
     }
+  };
+
+  // PCD 파일 업로드 핸들러 (서버 처리 방식)
+  const handlePcdUpload = async (file) => {
+    try {
+      console.log('🎯 MainPage: PCD 파일 업로드 시작:', {
+        fileName: file.name,
+        fileSize: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+        fileType: file.type,
+        lastModified: new Date(file.lastModified).toISOString()
+      });
+      
+      // 기존 데이터 정리
+      setPcdData(null);
+      setPcdProcessedData(null);
+      setShowPointCloud(false);
+      setPcdUploading(true);
+      setUploadProgress(0);
+      
+      const fileSizeMB = file.size / (1024 * 1024);
+      const fileSizeGB = fileSizeMB / 1024;
+      
+      // 파일 크기에 따른 최대 포인트 설정 (압축률 대폭 완화)
+      let maxPoints;
+      if (fileSizeMB > 1024) { // 1GB 이상
+        maxPoints = 500000;  // 200K → 500K (추가 2.5배 증가)
+      } else if (fileSizeMB > 500) { // 500MB 이상
+        maxPoints = 600000;  // 300K → 600K (2배 증가)
+      } else if (fileSizeMB > 100) { // 100MB 이상
+        maxPoints = 800000;  // 400K → 800K (2배 증가)
+      } else {
+        maxPoints = 1000000; // 500K → 1M (2배 증가)
+      }
+      
+      console.log('📊 처리 설정:', {
+        fileSizeMB: fileSizeMB.toFixed(2),
+        maxPoints,
+        compressionExpected: fileSizeMB > 1024 ? 'extreme' : fileSizeMB > 500 ? 'aggressive' : 'normal'
+      });
+      
+      actions.addNotification({
+        type: 'info',
+        message: `PCD 파일 "${file.name}" (${fileSizeMB.toFixed(2)} MB) 서버 처리 시작...`
+      });
+      
+      console.log('🔄 API 호출 시작...');
+      
+      // 서버로 업로드 및 처리
+      const result = await pcdAPI.uploadAndProcess(file, {
+        maxPoints,
+        onProgress: (progress) => {
+          setUploadProgress(progress);
+          console.log(`📈 MainPage 진행률 업데이트: ${progress}%`);
+        }
+      });
+      
+      console.log('🎉 MainPage: 서버 처리 완료:', {
+        success: result.success,
+        message: result.message,
+        dataKeys: result.data ? Object.keys(result.data) : null,
+        originalCount: result.data?.originalCount,
+        processedCount: result.data?.processedCount
+      });
+      
+      if (result.success) {
+        // 처리된 데이터를 상태에 저장
+        setPcdProcessedData(result.data);
+        setShowPointCloud(true);
+        
+        actions.addNotification({
+          type: 'success',
+          message: `PCD 파일 처리 완료! ${result.data.originalCount.toLocaleString()} → ${result.data.processedCount.toLocaleString()} 포인트 (${result.data.compressionRatio}% 압축)`
+        });
+      } else {
+        throw new Error(result.message || '서버 처리 중 오류가 발생했습니다.');
+      }
+      
+    } catch (error) {
+      console.error('💥 MainPage: PCD 파일 업로드 오류:', {
+        errorMessage: error.message,
+        errorName: error.name,
+        errorStack: error.stack,
+        currentStates: {
+          pcdUploading,
+          uploadProgress,
+          hasPcdProcessedData: !!pcdProcessedData
+        }
+      });
+      
+      // 에러 상태 정리
+      setPcdProcessedData(null);
+      setShowPointCloud(false);
+      
+      actions.addNotification({
+        type: 'error',
+        message: error.message || 'PCD 파일 업로드 및 처리에 실패했습니다.'
+      });
+      throw error;
+    } finally {
+      console.log('🔄 MainPage: PCD 업로드 프로세스 종료, 상태 정리 중...');
+      setPcdUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  // 포인트클라우드 표시/숨김 토글
+  const handleTogglePointCloud = () => {
+    setShowPointCloud(prev => !prev);
+    
+    actions.addNotification({
+      type: 'info',
+      message: `포인트클라우드가 ${!showPointCloud ? '표시' : '숨김'}됩니다.`
+    });
   };
 
   return (
@@ -734,6 +854,10 @@ const MainPage = () => {
                 initialCameraState={cameraState}
                 onCameraStateChange={handleCameraStateChange}
                 onMoveRequest={handleMoveRequest}
+                pcdData={pcdProcessedData}
+                showPointCloud={showPointCloud}
+                pcdUploading={pcdUploading}
+                uploadProgress={uploadProgress}
               />
               <MainViewOverlay stats={stats} />
               <MapControls
@@ -748,6 +872,12 @@ const MainPage = () => {
                 selectedMap={selectedMap}
                 onMapSelect={handleMapSelect}
                 mapLoading={mapLoading}
+                onPcdUpload={handlePcdUpload}
+                showPointCloud={showPointCloud}
+                onTogglePointCloud={handleTogglePointCloud}
+                pcdUploading={pcdUploading}
+                uploadProgress={uploadProgress}
+                pcdProcessedData={pcdProcessedData}
               />
             </>
           )}
@@ -766,6 +896,7 @@ const MainPage = () => {
         mission={selectedMissionDetail}
         isOpen={showMissionDetail}
         onClose={handleCloseMissionDetail}
+        onMissionUpdate={handleMissionUpdate}
       />
 
       {/* 태스크 추가 모달 */}
@@ -773,8 +904,9 @@ const MainPage = () => {
         isOpen={showTaskModal}
         onClose={() => setShowTaskModal(false)}
         onTaskCreated={() => {
-          // 미션 목록 새로고침
+          // 미션 및 로봇 목록 새로고침
           loadMissions();
+          loadRobots(); // 로봇 상태도 업데이트 (새 작업 할당으로 인한 상태 변경)
           setShowTaskModal(false);
         }}
         robots={activeRobots}

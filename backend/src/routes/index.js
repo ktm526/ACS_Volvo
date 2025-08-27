@@ -5,6 +5,7 @@ const router = express.Router();
 const robotRoutes = require('./robots');
 const mapRoutes = require('./maps');
 const missionRoutes = require('./missions');
+const pcdRoutes = require('./pcd');
 
 // 기본 라우트
 router.get('/', (req, res) => {
@@ -14,7 +15,8 @@ router.get('/', (req, res) => {
     endpoints: {
       robots: '/api/robots',
       maps: '/api/maps',
-      missions: '/api/missions'
+      missions: '/api/missions',
+      pcd: '/api/pcd'
     }
   });
 });
@@ -23,5 +25,6 @@ router.get('/', (req, res) => {
 router.use('/robots', robotRoutes);
 router.use('/maps', mapRoutes);
 router.use('/missions', missionRoutes);
+router.use('/pcd', pcdRoutes);
 
 module.exports = router; 

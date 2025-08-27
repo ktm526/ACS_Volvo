@@ -1,0 +1,18 @@
+{
+  "watch": [
+    "src/**/*",
+    "server.js",
+    "app.js"
+  ],
+  "ignore": [
+    "uploads/**/*",
+    "db/**/*",
+    "*.log",
+    "*.tmp",
+    "node_modules/**/*"
+  ],
+  "ext": "js,json",
+  "env": {
+    "NODE_ENV": "development"
+  }
+}

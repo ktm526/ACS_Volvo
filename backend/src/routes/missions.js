@@ -8,7 +8,7 @@ router.get('/', async (req, res) => {
     const missions = await Mission.findAll();
     res.json({ data: missions.map(mission => mission.toJSON()) });
   } catch (error) {
-    console.error('미션 조회 실패:', error);
+    
     res.status(500).json({ error: '미션 조회 중 오류가 발생했습니다.' });
   }
 });
@@ -16,7 +16,7 @@ router.get('/', async (req, res) => {
 // 새 미션 생성
 router.post('/', async (req, res) => {
   try {
-    console.log('미션 생성 요청:', req.body);
+    
     
     // 데이터 유효성 검증
     const validationErrors = Mission.validate(req.body);
@@ -27,13 +27,13 @@ router.post('/', async (req, res) => {
     // 미션 생성
     const mission = await Mission.create(req.body);
     
-    console.log('미션 생성 성공:', mission.toJSON());
+    
     res.status(201).json({ 
       message: '미션이 성공적으로 생성되었습니다.', 
       data: mission.toJSON() 
     });
   } catch (error) {
-    console.error('미션 생성 실패:', error);
+    
     res.status(500).json({ error: '미션 생성 중 오류가 발생했습니다.' });
   }
 });
@@ -50,7 +50,7 @@ router.get('/:id', async (req, res) => {
     
     res.json({ data: mission.toJSON() });
   } catch (error) {
-    console.error('미션 조회 실패:', error);
+    
     res.status(500).json({ error: '미션 조회 중 오류가 발생했습니다.' });
   }
 });
@@ -69,6 +69,43 @@ router.patch('/:id/status', async (req, res) => {
     if (!mission) {
       return res.status(404).json({ error: '미션을 찾을 수 없습니다.' });
     }
+
+    // 미션 취소 시 해당 로봇에게 정지 명령 전송
+    if (status === 'cancelled' && mission.robot_id) {
+      try {
+        const Robot = require('../models/Robot');
+        const axios = require('axios');
+        
+        const robot = await Robot.findById(mission.robot_id);
+        if (robot) {
+          
+          
+          const stopCommand = {
+            action: "stop"
+          };
+          
+          const robotApiUrl = `http://${robot.ip_address}:${robot.port || 5001}/api/v1/amr/command`;
+          
+          try {
+            await axios.post(robotApiUrl, stopCommand, { timeout: 3000 });
+            
+            
+            // 로봇 상태 초기화
+            await robot.update({
+              current_task_id: null,
+              current_waypoint_index: 0,
+              task_status: 'idle',
+              status: 'idle'
+            });
+            
+          } catch (robotError) {
+            
+          }
+        }
+      } catch (robotError) {
+        
+      }
+    }
     
     await mission.updateStatus(status);
     
@@ -77,7 +114,7 @@ router.patch('/:id/status', async (req, res) => {
       data: mission.toJSON() 
     });
   } catch (error) {
-    console.error('미션 상태 업데이트 실패:', error);
+    
     res.status(500).json({ error: '미션 상태 업데이트 중 오류가 발생했습니다.' });
   }
 });
@@ -104,7 +141,7 @@ router.patch('/:id/progress', async (req, res) => {
       data: mission.toJSON() 
     });
   } catch (error) {
-    console.error('미션 진행률 업데이트 실패:', error);
+    
     res.status(500).json({ error: '미션 진행률 업데이트 중 오류가 발생했습니다.' });
   }
 });
@@ -123,7 +160,7 @@ router.delete('/:id', async (req, res) => {
     
     res.json({ message: '미션이 삭제되었습니다.' });
   } catch (error) {
-    console.error('미션 삭제 실패:', error);
+    
     res.status(500).json({ error: '미션 삭제 중 오류가 발생했습니다.' });
   }
 });

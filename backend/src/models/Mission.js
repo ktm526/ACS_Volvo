@@ -76,6 +76,27 @@ class Mission {
     });
   }
 
+  // 완료/취소된 작업 중 지정된 시간 이전에 업데이트된 것들 조회
+  static findCompletedBefore(beforeTime) {
+    const db = getDatabase();
+    return new Promise((resolve, reject) => {
+      const query = `
+        SELECT * FROM missions 
+        WHERE status IN ('completed', 'cancelled') 
+        AND updated_at < ? 
+        ORDER BY updated_at ASC
+      `;
+      
+      db.all(query, [beforeTime], (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows.map(row => new Mission(row)));
+        }
+      });
+    });
+  }
+
   static create(data) {
     const db = getDatabase();
     return new Promise((resolve, reject) => {

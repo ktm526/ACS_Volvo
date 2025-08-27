@@ -18,45 +18,8 @@ const Sidebar = ({
   onClose,
   onOpenTaskModal
 }) => {
-  const [localMissions, setLocalMissions] = useState(missions);
-  const [localRobots, setLocalRobots] = useState(robots);
-  const [lastUpdateTime, setLastUpdateTime] = useState(Date.now());
-  
-  const stats = calculateStats(localRobots);
-  const missionStats = calculateMissionStats(localMissions);
-
-  // 데이터 업데이트 함수
-  const updateData = useCallback(async () => {
-    try {
-      const [robotsResponse, missionsResponse] = await Promise.all([
-        api.getRobots(),
-        api.getMissions()
-      ]);
-      
-      setLocalRobots(robotsResponse.data || []);
-      setLocalMissions(missionsResponse.data || []);
-      setLastUpdateTime(Date.now());
-    } catch (error) {
-      console.error('데이터 업데이트 실패:', error);
-    }
-  }, []);
-
-  // 초기 데이터 설정
-  useEffect(() => {
-    setLocalRobots(robots);
-    setLocalMissions(missions);
-  }, [robots, missions]);
-
-  // 실시간 데이터 업데이트
-  useEffect(() => {
-    // 즉시 한 번 업데이트
-    updateData();
-    
-    // 3초마다 자동 업데이트
-    const interval = setInterval(updateData, 3000);
-    
-    return () => clearInterval(interval);
-  }, [updateData]);
+  const stats = calculateStats(robots);
+  const missionStats = calculateMissionStats(missions);
 
   // 동적 CSS 애니메이션 주입
   useEffect(() => {
@@ -481,9 +444,9 @@ const Sidebar = ({
           <>
             {sidebarTab === 'robots' ? (
               // 로봇 목록
-              localRobots.map(robot => (
+              robots.map(robot => (
                 <RobotCard
-                  key={`${robot.id}-${lastUpdateTime}`}
+                  key={robot.id}
                   robot={robot}
                   isTracked={trackedRobot === robot.id}
                   onShowDetail={onShowRobotDetail}
@@ -493,13 +456,12 @@ const Sidebar = ({
               ))
             ) : (
               // 작업 목록
-              localMissions.map(mission => (
+              missions.map(mission => (
                 <MissionCard
-                  key={`${mission.id}-${lastUpdateTime}`}
+                  key={mission.id}
                   mission={mission}
                   onShowDetail={onShowMissionDetail}
                   isMobile={isMobile}
-                  lastUpdateTime={lastUpdateTime}
                 />
               ))
             )}
@@ -535,7 +497,11 @@ const Sidebar = ({
               alignItems: 'center',
               justifyContent: 'center',
               gap: 'var(--space-sm)',
-              boxShadow: '0 4px 20px rgba(0, 212, 255, 0.4), 0 0 40px rgba(0, 212, 255, 0.2)'
+              boxShadow: '0 4px 20px rgba(0, 212, 255, 0.4), 0 0 40px rgba(0, 212, 255, 0.2)',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              MozUserSelect: 'none',
+              msUserSelect: 'none'
             }}
             onMouseEnter={(e) => {
               e.target.style.backgroundColor = '#00b8e6';

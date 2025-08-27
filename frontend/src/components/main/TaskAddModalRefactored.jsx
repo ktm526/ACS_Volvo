@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { STATION_TYPES } from '../../constants';
 import { useMissions } from '../../hooks/useMissions';
+import { savePreset, getPresets, deletePreset } from '../../utils/presetUtils';
 import TaskFormSection from './TaskFormSection';
 import StepInputSection from './StepInputSection';
 import StepListSection from './StepListSection';
+import PresetPanel from './PresetPanel';
 
 const TaskAddModal = ({ isOpen, onClose, onTaskCreated, robots = [], mapData = null }) => {
   const { createMission } = useMissions();
@@ -24,7 +26,22 @@ const TaskAddModal = ({ isOpen, onClose, onTaskCreated, robots = [], mapData = n
   const [tempPositions, setTempPositions] = useState({}); // 임시 위치 상태 (애니메이션용)
   const [highlightedItem, setHighlightedItem] = useState(null); // 하이라이트할 아이템 (버튼을 누른 아이템)
   
+  // 프리셋 관련 state
+  const [presets, setPresets] = useState([]);
+  const [showPresetPanel, setShowPresetPanel] = useState(false);
+  const [hoveredPreset, setHoveredPreset] = useState(null);
 
+  // 프리셋 목록 로드
+  useEffect(() => {
+    const loadPresets = () => {
+      const savedPresets = getPresets();
+      setPresets(savedPresets);
+    };
+    
+    if (isOpen) {
+      loadPresets();
+    }
+  }, [isOpen]);
 
   // 노드 타입을 스테이션 타입으로 변환하는 함수
   const getNodeType = (nodeType) => {
@@ -187,7 +204,43 @@ const TaskAddModal = ({ isOpen, onClose, onTaskCreated, robots = [], mapData = n
     }
   };
 
-
+  // 프리셋 저장
+  const handleSavePreset = () => {
+    if (waypoints.length === 0) {
+      alert('저장할 스텝이 없습니다.');
+      return;
+    }
+    
+    const presetName = prompt('프리셋 이름을 입력하세요:', `프리셋 ${new Date().toLocaleString()}`);
+    if (presetName && presetName.trim()) {
+      const trimmedName = presetName.trim();
+      
+      // 중복 이름 체크
+      const existingPresets = getPresets();
+      const isDuplicate = existingPresets.some(p => p.name === trimmedName);
+      
+      if (isDuplicate) {
+        if (!confirm(`'${trimmedName}' 이름의 프리셋이 이미 존재합니다. 덮어쓰시겠습니까?`)) {
+          return;
+        }
+        // 기존 프리셋 삭제
+        const existingPreset = existingPresets.find(p => p.name === trimmedName);
+        if (existingPreset) {
+          deletePreset(existingPreset.id);
+        }
+      }
+      
+      const result = savePreset(trimmedName, waypoints);
+      if (result.success) {
+        alert(`'${trimmedName}' 프리셋이 저장되었습니다.`);
+        // 프리셋 목록 새로고침
+        const updatedPresets = getPresets();
+        setPresets(updatedPresets);
+      } else {
+        alert(`프리셋 저장 실패: ${result.error}`);
+      }
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -290,14 +343,36 @@ const TaskAddModal = ({ isOpen, onClose, onTaskCreated, robots = [], mapData = n
             position: 'relative'
           }}>
             {/* 왼쪽 - 폼 */}
-            <TaskFormSection 
-              formData={formData}
-              setFormData={setFormData}
-              currentStepType={currentStepType}
-              setCurrentStepType={setCurrentStepType}
-              robots={robots}
-              error={error}
-            />
+            <div style={{ position: 'relative' }}>
+              <TaskFormSection 
+                formData={formData}
+                setFormData={setFormData}
+                currentStepType={currentStepType}
+                setCurrentStepType={setCurrentStepType}
+                robots={robots}
+                error={error}
+              />
+              
+              {/* 프리셋 패널 */}
+              <div style={{
+                position: 'absolute',
+                bottom: 'var(--space-lg)',
+                left: 'var(--space-lg)',
+                right: 'var(--space-lg)',
+                zIndex: 1000
+              }}>
+                <PresetPanel 
+                  presets={presets}
+                  setPresets={setPresets}
+                  showPresetPanel={showPresetPanel}
+                  setShowPresetPanel={setShowPresetPanel}
+                  hoveredPreset={hoveredPreset}
+                  setHoveredPreset={setHoveredPreset}
+                  waypoints={waypoints}
+                  setWaypoints={setWaypoints}
+                />
+              </div>
+            </div>
 
             {/* 가운데 - 스텝 입력 영역 */}
             <StepInputSection 
@@ -316,7 +391,6 @@ const TaskAddModal = ({ isOpen, onClose, onTaskCreated, robots = [], mapData = n
               animatingItems={animatingItems}
               highlightedItem={highlightedItem}
               tempPositions={tempPositions}
-              setWaypoints={setWaypoints}
             />
           </div>
 
@@ -359,7 +433,43 @@ const TaskAddModal = ({ isOpen, onClose, onTaskCreated, robots = [], mapData = n
             >
               취소
             </button>
-
+            <button
+              type="button"
+              onClick={handleSavePreset}
+              disabled={waypoints.length === 0}
+              style={{
+                padding: 'var(--space-md) var(--space-lg)',
+                backgroundColor: waypoints.length === 0 ? 'var(--bg-primary)' : '#6366f1',
+                border: '1px solid var(--border-primary)',
+                borderRadius: 'var(--radius-md)',
+                color: waypoints.length === 0 ? 'var(--text-tertiary)' : 'white',
+                fontSize: 'var(--font-size-sm)',
+                fontWeight: '600',
+                cursor: waypoints.length === 0 ? 'not-allowed' : 'pointer',
+                transition: 'all 0.3s ease',
+                minWidth: '120px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-xs)',
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                MozUserSelect: 'none',
+                msUserSelect: 'none'
+              }}
+              onMouseEnter={(e) => {
+                if (waypoints.length > 0) {
+                  e.target.style.backgroundColor = '#5855eb';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (waypoints.length > 0) {
+                  e.target.style.backgroundColor = '#6366f1';
+                }
+              }}
+            >
+              <i className="fas fa-save"></i>
+              프리셋 저장
+            </button>
             <button
               type="button"
               onClick={handleSubmit}
@@ -418,3 +528,4 @@ const TaskAddModal = ({ isOpen, onClose, onTaskCreated, robots = [], mapData = n
 };
 
 export default TaskAddModal;
+

@@ -13,13 +13,20 @@ const MapControls = ({
   availableMaps = [],
   selectedMap = null,
   onMapSelect,
-  mapLoading = false
+  mapLoading = false,
+  onPcdUpload,
+  showPointCloud = false,
+  onTogglePointCloud,
+  pcdUploading = false,
+  uploadProgress = 0,
+  pcdProcessedData = null
 }) => {
   const { state } = useAppContext();
   const [isExpanded, setIsExpanded] = useState(false);
   const [showRobotList, setShowRobotList] = useState(false);
   const [showMapList, setShowMapList] = useState(false);
   const controlsRef = useRef(null);
+  const pcdFileInputRef = useRef(null);
 
   // 외부 클릭 시 닫기
   useEffect(() => {
@@ -59,6 +66,95 @@ const MapControls = ({
   const handleMapSelect = (map) => {
     onMapSelect?.(map);
     setShowMapList(false);
+  };
+
+  const handlePcdUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.pcd')) {
+      alert('PCD 파일만 업로드 가능합니다.');
+      return;
+    }
+
+    // 파일 크기 체크
+    const fileSizeMB = file.size / (1024 * 1024);
+    const fileSizeGB = fileSizeMB / 1024;
+    
+    console.log(`선택된 PCD 파일: ${file.name} (${fileSizeMB.toFixed(2)} MB)`);
+    
+    // 1GB 이상인 경우 극도 압축 경고
+    if (file.size > 1024 * 1024 * 1024) { // 1GB
+      const confirmed = confirm(
+        `⚠️ 초대용량 파일 감지\n\n` +
+        `파일 크기: ${fileSizeGB.toFixed(2)} GB\n` +
+        `이 크기의 파일은 브라우저에 무리를 줄 수 있습니다.\n\n` +
+        `📉 극도 압축 모드로 처리됩니다:\n` +
+        `• 원본: ${(fileSizeMB / 1024 * 10000000).toLocaleString()}+ 포인트 예상\n` +
+        `• 표시: 약 50,000 포인트 (99.5%+ 압축)\n` +
+        `• 처리 시간: 3-5분 소요 예상\n\n` +
+        `그래도 진행하시겠습니까?`
+      );
+      
+      if (!confirmed) {
+        if (pcdFileInputRef.current) {
+          pcdFileInputRef.current.value = '';
+        }
+        return;
+      }
+    }
+    // 500MB 이상인 경우 강력한 압축 경고
+    else if (file.size > 500 * 1024 * 1024) { // 500MB
+      const confirmed = confirm(
+        `📊 대용량 파일 처리\n\n` +
+        `파일 크기: ${fileSizeMB.toFixed(2)} MB\n` +
+        `브라우저 안정성을 위해 강력한 다운샘플링이 적용됩니다.\n\n` +
+        `📉 압축 설정:\n` +
+        `• 예상 포인트: ${(fileSizeMB * 20000).toLocaleString()}\n` +
+        `• 표시 포인트: 약 100,000개\n` +
+        `• 압축률: 약 95%+\n\n` +
+        `계속 진행하시겠습니까?`
+      );
+      
+      if (!confirmed) {
+        if (pcdFileInputRef.current) {
+          pcdFileInputRef.current.value = '';
+        }
+        return;
+      }
+    }
+    // 100MB 이상인 경우 일반 압축 안내
+    else if (file.size > 100 * 1024 * 1024) { // 100MB
+      const confirmed = confirm(
+        `📊 대용량 파일 알림\n\n` +
+        `파일 크기: ${fileSizeMB.toFixed(2)} MB\n` +
+        `성능 최적화를 위해 다운샘플링이 적용됩니다.\n\n` +
+        `계속 진행하시겠습니까?`
+      );
+      
+      if (!confirmed) {
+        if (pcdFileInputRef.current) {
+          pcdFileInputRef.current.value = '';
+        }
+        return;
+      }
+    }
+
+    try {
+      await onPcdUpload?.(file);
+    } catch (error) {
+      console.error('PCD 파일 업로드 실패:', error);
+      alert(`PCD 파일 업로드에 실패했습니다.\n오류: ${error.message || '알 수 없는 오류'}`);
+    } finally {
+      // 같은 파일을 다시 선택할 수 있도록 리셋
+      if (pcdFileInputRef.current) {
+        pcdFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handlePcdButtonClick = () => {
+    pcdFileInputRef.current?.click();
   };
 
   const getViewModeIcon = () => {
@@ -451,6 +547,129 @@ const MapControls = ({
               </div>
             </div>
 
+            {/* 포인트클라우드 컨트롤 */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-sm)',
+              marginBottom: 'var(--space-sm)',
+              padding: '8px 0',
+              borderBottom: '1px solid var(--border-primary)'
+            }}>
+              <div style={{
+                fontSize: '11px',
+                color: 'var(--text-secondary)',
+                fontWeight: '600',
+                minWidth: '40px'
+              }}>
+                PCD:
+              </div>
+              <div style={{
+                display: 'flex',
+                gap: '4px',
+                flex: 1
+              }}>
+                <button
+                  onClick={handlePcdButtonClick}
+                  disabled={pcdUploading}
+                  style={{
+                    background: pcdUploading ? 
+                      'linear-gradient(135deg, var(--primary-color)20, var(--primary-color)10)' :
+                      'linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary))',
+                    border: `1px solid ${pcdUploading ? 'var(--primary-color)40' : 'var(--border-primary)'}`,
+                    borderRadius: '6px',
+                    padding: '6px 10px',
+                    color: 'var(--text-primary)',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    cursor: pcdUploading ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-xs)',
+                    opacity: pcdUploading ? 0.8 : 1,
+                    flex: 1,
+                    position: 'relative'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!pcdUploading) {
+                      e.target.style.background = 'linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary))';
+                      e.target.style.transform = 'translateY(-1px)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!pcdUploading) {
+                      e.target.style.background = 'linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary))';
+                      e.target.style.transform = 'translateY(0)';
+                    }
+                  }}
+                >
+                  <i className={`fas ${pcdUploading ? 'fa-cloud-upload-alt fa-pulse' : 'fa-upload'}`} style={{ fontSize: '10px' }}></i>
+                  {pcdUploading ? `서버 처리중... ${uploadProgress}%` : 'PCD 업로드'}
+                  
+                  {/* 진행률 바 */}
+                  {pcdUploading && uploadProgress > 0 && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '1px',
+                      left: '1px',
+                      right: '1px',
+                      height: '2px',
+                      backgroundColor: 'rgba(0, 212, 255, 0.2)',
+                      borderRadius: '0 0 5px 5px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        width: `${uploadProgress}%`,
+                        height: '100%',
+                        backgroundColor: 'var(--primary-color)',
+                        transition: 'width 0.3s ease'
+                      }} />
+                    </div>
+                  )}
+                </button>
+                
+                <button
+                  onClick={() => onTogglePointCloud?.()}
+                  disabled={!pcdProcessedData && !pcdUploading}
+                  style={{
+                    background: showPointCloud ? 'linear-gradient(135deg, var(--primary-color)30, var(--primary-color)15)' : 'var(--bg-secondary)',
+                    border: `1px solid ${showPointCloud ? 'var(--primary-color)40' : 'var(--border-primary)'}`,
+                    borderRadius: '6px',
+                    padding: '6px 8px',
+                    color: 'var(--text-primary)',
+                    fontSize: '12px',
+                    cursor: (!pcdProcessedData && !pcdUploading) ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '28px',
+                    height: '28px',
+                    opacity: (!pcdProcessedData && !pcdUploading) ? 0.5 : 1
+                  }}
+                  onMouseEnter={(e) => {
+                    if (pcdProcessedData || pcdUploading) {
+                      e.target.style.background = showPointCloud ? 
+                        'linear-gradient(135deg, var(--primary-color)40, var(--primary-color)20)' : 
+                        'var(--border-primary)';
+                      e.target.style.transform = 'scale(1.05)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (pcdProcessedData || pcdUploading) {
+                      e.target.style.background = showPointCloud ? 
+                        'linear-gradient(135deg, var(--primary-color)30, var(--primary-color)15)' : 
+                        'var(--bg-secondary)';
+                      e.target.style.transform = 'scale(1)';
+                    }
+                  }}
+                >
+                  <i className={`fas ${showPointCloud ? 'fa-eye' : 'fa-eye-slash'}`} style={{ fontSize: '10px' }}></i>
+                </button>
+              </div>
+            </div>
+
             {/* 로봇 트래킹 */}
             <div style={{
               display: 'flex',
@@ -638,6 +857,15 @@ const MapControls = ({
           )}
         </div>
       )}
+      
+      {/* 숨겨진 PCD 파일 입력 */}
+      <input
+        ref={pcdFileInputRef}
+        type="file"
+        accept=".pcd"
+        style={{ display: 'none' }}
+        onChange={handlePcdUpload}
+      />
     </div>
   );
 };

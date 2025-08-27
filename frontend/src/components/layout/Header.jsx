@@ -94,10 +94,13 @@ const Header = () => {
     }
   };
 
-  // 화면 크기 감지 (950px 이하에서 컴팩트 모드)
+  // 화면 크기 감지 (950px 이하에서 컴팩트 모드, 768px 이하에서 모바일)
+  const [isMobile, setIsMobile] = useState(false);
+  
   useEffect(() => {
     const checkScreenSize = () => {
       setIsCompact(window.innerWidth <= 950);
+      setIsMobile(window.innerWidth <= 768);
       // 화면 크기 변경 시 배경 위치도 업데이트
       setTimeout(() => {
         updateActiveMenuPosition();
@@ -234,38 +237,42 @@ const Header = () => {
         ref={navContainerRef}
         className="header-navigation"
         style={{
-          border: '1px solid var(--primary-color)',
-          borderColor: navHovered ? 'var(--accent-color)' : 'var(--primary-color)',
-          boxShadow: navHovered 
+          // 모바일에서는 모든 시각적 효과 제거
+          border: isMobile ? 'none' : '1px solid var(--primary-color)',
+          borderColor: isMobile ? 'transparent' : (navHovered ? 'var(--accent-color)' : 'var(--primary-color)'),
+          boxShadow: isMobile ? 'none' : (navHovered 
             ? '0 0 20px var(--primary-color), 0 0 35px rgba(0, 212, 255, 0.2)' 
-            : '0 0 15px var(--primary-color), 0 0 25px rgba(0, 212, 255, 0.15)',
+            : '0 0 15px var(--primary-color), 0 0 25px rgba(0, 212, 255, 0.15)'),
           transition: 'all 0.3s ease',
           // 컴팩트 모드에서는 더 작게
           padding: isCompact ? '0.5rem' : undefined,
           position: 'relative',
-          borderRadius: '50px'
+          borderRadius: isMobile ? '0' : '50px',
+          background: isMobile ? 'transparent' : undefined
         }}
-        onMouseEnter={() => setNavHovered(true)}
-        onMouseLeave={() => setNavHovered(false)}
+        onMouseEnter={() => !isMobile && setNavHovered(true)}
+        onMouseLeave={() => !isMobile && setNavHovered(false)}
       >
-        {/* 애니메이션 배경 */}
-        <div 
-          style={{
-            position: 'absolute',
-            top: '4px',
-            left: activeMenuStyle.left,
-            width: activeMenuStyle.width,
-            height: 'calc(100% - 8px)',
-            background: 'linear-gradient(135deg, rgba(0, 212, 255, 0.25), rgba(0, 212, 255, 0.15))',
-            borderRadius: '50px',
-            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-            opacity: activeMenuStyle.opacity,
-            boxShadow: '0 0 20px rgba(0, 212, 255, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
-            zIndex: 1,
-            pointerEvents: 'none',
-            border: '1px solid rgba(0, 212, 255, 0.4)'
-          }}
-        />
+        {/* 애니메이션 배경 - 모바일에서는 숨김 */}
+        {!isMobile && (
+          <div 
+            style={{
+              position: 'absolute',
+              top: '4px',
+              left: activeMenuStyle.left,
+              width: activeMenuStyle.width,
+              height: 'calc(100% - 8px)',
+              background: 'linear-gradient(135deg, rgba(0, 212, 255, 0.25), rgba(0, 212, 255, 0.15))',
+              borderRadius: '50px',
+              transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+              opacity: activeMenuStyle.opacity,
+              boxShadow: '0 0 20px rgba(0, 212, 255, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
+              zIndex: 1,
+              pointerEvents: 'none',
+              border: '1px solid rgba(0, 212, 255, 0.4)'
+            }}
+          />
+        )}
         
         {MENU_ITEMS.map(item => {
           const isActive = state.currentPage === item.id;
@@ -290,39 +297,43 @@ const Header = () => {
                 transition: 'color 0.3s ease',
                 fontWeight: isActive ? '600' : '400'
               }}
-              onMouseEnter={() => setHoveredMenuItem(item.id)}
-              onMouseLeave={() => setHoveredMenuItem(null)}
+              onMouseEnter={() => !isMobile && setHoveredMenuItem(item.id)}
+              onMouseLeave={() => !isMobile && setHoveredMenuItem(null)}
             >
               <i 
                 className={menuIcons[item.id]}
                 style={{
                   color: isActive ? '#00d4ff' : 'inherit',
-                  textShadow: isActive ? '0 0 8px rgba(0, 212, 255, 0.6)' : 'none',
+                  // 모바일에서는 텍스트 그림자 제거
+                  textShadow: isMobile ? 'none' : (isActive ? '0 0 8px rgba(0, 212, 255, 0.6)' : 'none'),
                   transition: 'all 0.3s ease'
                 }}
               ></i>
               <span style={{
                 color: isActive ? (state.ui.theme === 'dark' ? '#ffffff' : '#2c3e50') : 'inherit',
-                textShadow: isActive && state.ui.theme === 'dark' ? '0 0 8px rgba(255, 255, 255, 0.3)' : 'none',
+                // 모바일에서는 텍스트 그림자 제거
+                textShadow: isMobile ? 'none' : (isActive && state.ui.theme === 'dark' ? '0 0 8px rgba(255, 255, 255, 0.3)' : 'none'),
                 transition: 'all 0.3s ease'
               }}>
                 {item.label}
               </span>
               
-              {/* 메뉴 아이템별 하단 라인 */}
-              <div 
-                style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  height: '1px',
-                  background: 'linear-gradient(90deg, transparent, var(--primary-color), var(--accent-color), var(--primary-color), transparent)',
-                  opacity: isHovered ? 1 : (isActive ? 0.7 : 0),
-                  boxShadow: isHovered ? '0 0 6px var(--primary-color)' : 'none',
-                  transition: 'all 0.3s ease'
-                }}
-              />
+              {/* 메뉴 아이템별 하단 라인 - 모바일에서는 숨김 */}
+              {!isMobile && (
+                <div 
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: '1px',
+                    background: 'linear-gradient(90deg, transparent, var(--primary-color), var(--accent-color), var(--primary-color), transparent)',
+                    opacity: isHovered ? 1 : (isActive ? 0.7 : 0),
+                    boxShadow: isHovered ? '0 0 6px var(--primary-color)' : 'none',
+                    transition: 'all 0.3s ease'
+                  }}
+                />
+              )}
             </button>
           );
         })}
@@ -409,20 +420,22 @@ const Header = () => {
         </div>
       </div>
 
-      {/* 하단 호버 라인 */}
-      <div 
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: '2px',
-          background: 'linear-gradient(90deg, transparent, var(--primary-color), var(--accent-color), var(--primary-color), transparent)',
-          opacity: isHovered ? 1 : 0.6,
-          boxShadow: isHovered ? '0 0 8px var(--primary-color)' : 'none',
-          transition: 'all 0.3s ease'
-        }}
-      />
+      {/* 하단 호버 라인 - 모바일에서는 숨김 */}
+      {!isMobile && (
+        <div 
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: '2px',
+            background: 'linear-gradient(90deg, transparent, var(--primary-color), var(--accent-color), var(--primary-color), transparent)',
+            opacity: isHovered ? 1 : 0.6,
+            boxShadow: isHovered ? '0 0 8px var(--primary-color)' : 'none',
+            transition: 'all 0.3s ease'
+          }}
+        />
+      )}
     </header>
   );
 };

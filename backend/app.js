@@ -13,7 +13,7 @@ const app = express();
 app.use(helmet()); // 보안 강화
 app.use(cors());   // CORS 활성화
 app.use(express.json());
-app.use(morgan('dev')); // 로깅
+//app.use(morgan('dev')); // 로깅
 
 // 라우트 설정
 app.use('/api', routes);

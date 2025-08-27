@@ -1,13 +1,15 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getStatusColor } from '../../constants';
 import { getTypeIcon, getPriorityColor } from '../../utils/mainPageUtils';
 import { useAppContext } from '../../contexts/AppContext';
+import { api } from '../../services/api';
 
-const MissionDetailModal = ({ mission, isOpen, onClose }) => {
+const MissionDetailModal = ({ mission, isOpen, onClose, onMissionUpdate }) => {
   if (!isOpen || !mission) return null;
 
   const { state } = useAppContext();
+  const [isLoading, setIsLoading] = useState(false);
   const statusColor = getStatusColor(mission.status);
   const priorityColor = getPriorityColor(mission.priority);
 
@@ -86,6 +88,44 @@ const MissionDetailModal = ({ mission, isOpen, onClose }) => {
     e.stopPropagation();
   };
 
+  // 작업 취소 핸들러
+  const handleCancelMission = async () => {
+    if (mission.status === 'completed' || mission.status === 'cancelled') {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `정말로 "${mission.name || mission.title}" 작업을 취소하시겠습니까?\n\n` +
+      '이 작업은 되돌릴 수 없습니다.'
+    );
+
+    if (!confirmed) return;
+
+    setIsLoading(true);
+    try {
+      console.log(`🚫 작업 취소 요청: ${mission.name} (ID: ${mission.id})`);
+      
+      // API를 통해 작업 취소
+      await api.updateMissionStatus(mission.id, 'cancelled');
+
+      console.log(`✅ 작업 취소 완료: ${mission.name}`);
+      
+      // 상위 컴포넌트에 업데이트 알림
+      if (onMissionUpdate) {
+        onMissionUpdate();
+      }
+      
+      // 모달 닫기
+      onClose();
+      
+    } catch (error) {
+      console.error('❌ 작업 취소 실패:', error);
+      alert('작업 취소에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // 정보 항목 컴포넌트
   const InfoItem = ({ label, value, color, isMonospace = false, unit = '' }) => (
     <div style={{
@@ -161,28 +201,29 @@ const MissionDetailModal = ({ mission, isOpen, onClose }) => {
       }}
       onClick={handleOverlayClick}
     >
-      <div
+              <div
         onClick={handleModalClick}
         style={{
           backgroundColor: 'var(--bg-primary)',
           borderRadius: 'var(--radius-lg)',
-          padding: 'var(--space-lg)',
           maxWidth: '900px',
           width: '100%',
           maxHeight: '95vh',
-          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
           boxShadow: 'var(--shadow-modal)',
-          border: '1px solid var(--border-primary)'
+          border: '1px solid var(--border-primary)',
+          overflow: 'hidden'
         }}
       >
-        {/* 헤더 */}
+        {/* 헤더 (고정) */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 'var(--space-lg)',
+          padding: 'var(--space-lg)',
           borderBottom: '1px solid var(--border-primary)',
-          paddingBottom: 'var(--space-md)'
+          flexShrink: 0
         }}>
           <div style={{
             display: 'flex',
@@ -255,6 +296,13 @@ const MissionDetailModal = ({ mission, isOpen, onClose }) => {
           </button>
         </div>
 
+        {/* 콘텐츠 영역 (스크롤 가능) */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: 'var(--space-lg)',
+          paddingTop: 'var(--space-lg)'
+        }}>
         {/* 기본 상태 정보 */}
         <Section title="미션 상태" columns={3}>
           <div>
@@ -460,6 +508,65 @@ const MissionDetailModal = ({ mission, isOpen, onClose }) => {
           <InfoItem label="실제 소요 시간" value={mission.actual_duration ? `${mission.actual_duration}분` : 'N/A'} />
           <InfoItem label="오류 메시지" value={mission.error_message || '없음'} color={mission.error_message ? 'var(--status-error)' : 'var(--status-success)'} />
         </Section>
+
+        {/* 하단 버튼 영역 */}
+        <div style={{
+          marginTop: 'var(--space-lg)',
+          paddingTop: 'var(--space-lg)',
+          borderTop: '1px solid var(--border-primary)',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: 'var(--space-md)'
+        }}>
+          <button
+            onClick={handleCancelMission}
+            disabled={mission.status === 'completed' || mission.status === 'cancelled' || isLoading}
+            style={{
+              padding: '12px 24px',
+              border: mission.status === 'completed' || mission.status === 'cancelled' 
+                ? '1px solid var(--border-primary)' 
+                : '1px solid var(--status-error)',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: mission.status === 'completed' || mission.status === 'cancelled' 
+                ? 'var(--bg-tertiary)' 
+                : 'transparent',
+              color: mission.status === 'completed' || mission.status === 'cancelled' 
+                ? 'var(--text-tertiary)' 
+                : 'var(--status-error)',
+              fontSize: 'var(--font-size-sm)',
+              fontWeight: '600',
+              cursor: mission.status === 'completed' || mission.status === 'cancelled' 
+                ? 'not-allowed' 
+                : 'pointer',
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-sm)'
+            }}
+            onMouseEnter={(e) => {
+              if (mission.status !== 'completed' && mission.status !== 'cancelled') {
+                e.target.style.backgroundColor = 'var(--status-error)';
+                e.target.style.color = 'var(--bg-primary)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (mission.status !== 'completed' && mission.status !== 'cancelled') {
+                e.target.style.backgroundColor = 'transparent';
+                e.target.style.color = 'var(--status-error)';
+              }
+            }}
+          >
+            {isLoading ? (
+              <i className="fas fa-spinner fa-spin"></i>
+            ) : (
+              <i className="fas fa-times-circle"></i>
+            )}
+            {isLoading ? '취소 중...' :
+             mission.status === 'completed' ? '완료된 작업' : 
+             mission.status === 'cancelled' ? '취소된 작업' : '작업 취소'}
+          </button>
+        </div>
+        </div>
       </div>
     </div>
   );

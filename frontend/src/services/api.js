@@ -249,4 +249,110 @@ export const mockData = {
   ]
 };
 
+// PCD 포인트클라우드 관련 API
+export const pcdAPI = {
+  // PCD 파일 업로드 및 처리
+  uploadAndProcess: async (file, options = {}) => {
+    try {
+      const { maxPoints = 100000, onProgress } = options;
+      
+      console.log(`🚀 PCD 파일 업로드 시작:`, {
+        fileName: file.name,
+        fileSize: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+        maxPoints,
+        endpoint: '/api/pcd/upload'
+      });
+      
+      const formData = new FormData();
+      formData.append('pcdFile', file);
+      
+      const config = {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 300000, // 5분 타임아웃 (대용량 파일 처리)
+        params: {
+          maxPoints
+        }
+      };
+      
+      // 업로드 진행률 콜백이 있다면 추가
+      if (onProgress) {
+        config.onUploadProgress = (progressEvent) => {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          console.log(`📤 업로드 진행률: ${percentCompleted}%`);
+          onProgress(percentCompleted);
+        };
+      }
+      
+      console.log(`📡 서버로 요청 전송 중...`);
+      const response = await apiClient.post('/api/pcd/upload', formData, config);
+      
+      console.log(`✅ 서버 응답 받음:`, {
+        success: response.data.success,
+        originalCount: response.data.data?.originalCount,
+        processedCount: response.data.data?.processedCount,
+        compressionRatio: response.data.data?.compressionRatio
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('❌ PCD 업로드 오류:', {
+        message: error.message,
+        code: error.code,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        responseData: error.response?.data,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          timeout: error.config?.timeout
+        }
+      });
+      
+      if (error.response?.data?.message) {
+        throw new Error(`서버 오류: ${error.response.data.message}`);
+      } else if (error.code === 'ECONNABORTED') {
+        throw new Error('파일 처리 시간이 초과되었습니다. 더 작은 파일을 사용하거나 다시 시도해주세요.');
+      } else if (error.code === 'NETWORK_ERROR' || error.message.includes('Network Error')) {
+        throw new Error('서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.');
+      } else {
+        throw new Error(`PCD 파일 업로드 실패: ${error.message || '알 수 없는 오류'}`);
+      }
+    }
+  },
+
+  // 처리된 PCD 데이터 조회
+  getProcessedData: async (filename) => {
+    try {
+      const response = await apiClient.get(`/api/pcd/processed/${filename}`);
+      return response.data;
+    } catch (error) {
+      throw new Error('처리된 PCD 데이터를 불러오는데 실패했습니다.');
+    }
+  },
+
+  // 업로드 상태 확인
+  getUploadStatus: async () => {
+    try {
+      const response = await apiClient.get('/api/pcd/status');
+      return response.data;
+    } catch (error) {
+      throw new Error('PCD 업로드 서비스 상태 확인에 실패했습니다.');
+    }
+  },
+
+  // 처리된 파일 목록 조회
+  listProcessedFiles: async () => {
+    try {
+      const response = await apiClient.get('/api/pcd/files');
+      return response.data;
+    } catch (error) {
+      throw new Error('PCD 파일 목록을 불러오는데 실패했습니다.');
+    }
+  }
+};
+
 export default apiClient; 

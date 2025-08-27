@@ -9,7 +9,7 @@ const robotController = {
       const robots = await Robot.findAll();
       res.json({ data: robots });
     } catch (error) {
-      console.error('로봇 목록 조회 에러:', error);
+
       res.status(500).json({ error: '로봇 목록 조회 중 오류가 발생했습니다.' });
     }
   },
@@ -31,7 +31,7 @@ const robotController = {
       
       res.json({ data: robot });
     } catch (error) {
-      console.error('로봇 조회 에러:', error);
+
       res.status(500).json({ error: '로봇 조회 중 오류가 발생했습니다.' });
     }
   },
@@ -68,7 +68,7 @@ const robotController = {
         data: robot 
       });
     } catch (error) {
-      console.error('로봇 생성 에러:', error);
+
       res.status(500).json({ error: '로봇 생성 중 오류가 발생했습니다.' });
     }
   },
@@ -101,7 +101,7 @@ const robotController = {
         data: updatedRobot 
       });
     } catch (error) {
-      console.error('로봇 업데이트 에러:', error);
+
       res.status(500).json({ error: '로봇 업데이트 중 오류가 발생했습니다.' });
     }
   },
@@ -125,7 +125,7 @@ const robotController = {
       
       res.json({ message: '로봇이 성공적으로 삭제되었습니다.' });
     } catch (error) {
-      console.error('로봇 삭제 에러:', error);
+
       res.status(500).json({ error: '로봇 삭제 중 오류가 발생했습니다.' });
     }
   },
@@ -141,7 +141,7 @@ const robotController = {
         data: status
       });
     } catch (error) {
-      console.error('서비스 상태 조회 실패:', error);
+
       res.status(500).json({
         success: false,
         error: '서비스 상태 조회에 실패했습니다.',
@@ -159,7 +159,7 @@ const robotController = {
         message: '로봇 상태 수집 서비스가 시작되었습니다.'
       });
     } catch (error) {
-      console.error('서비스 시작 실패:', error);
+
       res.status(500).json({
         success: false,
         error: '서비스 시작에 실패했습니다.',
@@ -177,7 +177,7 @@ const robotController = {
         message: '로봇 상태 수집 서비스가 중지되었습니다.'
       });
     } catch (error) {
-      console.error('서비스 중지 실패:', error);
+
       res.status(500).json({
         success: false,
         error: '서비스 중지에 실패했습니다.',
@@ -205,7 +205,7 @@ const robotController = {
         data: robotStatusService.getStatus()
       });
     } catch (error) {
-      console.error('서비스 설정 업데이트 실패:', error);
+
       res.status(500).json({
         success: false,
         error: '서비스 설정 업데이트에 실패했습니다.',
@@ -223,7 +223,7 @@ const robotController = {
         message: '모든 로봇의 상태 수집이 실행되었습니다.'
       });
     } catch (error) {
-      console.error('전체 상태 수집 실패:', error);
+
       res.status(500).json({
         success: false,
         error: '상태 수집 실행에 실패했습니다.',
@@ -250,7 +250,7 @@ const robotController = {
         message: `로봇 ID ${id}의 상태 수집이 실행되었습니다.`
       });
     } catch (error) {
-      console.error('개별 로봇 상태 수집 실패:', error);
+
       res.status(500).json({
         success: false,
         error: '로봇 상태 수집에 실패했습니다.',
@@ -268,7 +268,7 @@ const robotController = {
         data: stats
       });
     } catch (error) {
-      console.error('상태 통계 조회 실패:', error);
+
       res.status(500).json({
         success: false,
         error: '상태 통계 조회에 실패했습니다.',
@@ -286,7 +286,7 @@ const robotController = {
         data: { connectedCount: count }
       });
     } catch (error) {
-      console.error('연결된 로봇 수 조회 실패:', error);
+
       res.status(500).json({
         success: false,
         error: '연결된 로봇 수 조회에 실패했습니다.',
@@ -360,7 +360,17 @@ const robotController = {
           }
         };
 
-        console.log(`📡 로봇에 명령 전송: ${robotCommandUrl}`, commandPayload);
+        console.log(`📡 로봇에 명령 전송: ${robotCommandUrl}`, {
+          ...commandPayload,
+          nodeId_type: typeof nodeId,
+          nodeId_value: nodeId,
+          robotInfo: {
+            id: robot.id,
+            name: robot.name,
+            ip: robot.ip_address,
+            port: port
+          }
+        });
 
         const robotResponse = await axios.post(robotCommandUrl, commandPayload, {
           timeout: 10000, // 10초 타임아웃
@@ -420,7 +430,7 @@ const robotController = {
       }
 
     } catch (error) {
-      console.error('AMR 이동 요청 실패:', error);
+
       res.status(500).json({
         success: false,
         error: 'AMR 이동 요청 처리 중 오류가 발생했습니다.',

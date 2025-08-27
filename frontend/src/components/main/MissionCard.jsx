@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { getPriorityColor, getTypeIcon } from '../../utils/mainPageUtils';
 import { getStatusColor, getStatusIcon } from '../../constants';
 
-const MissionCard = ({ mission, onShowDetail, isMobile = false, lastUpdateTime }) => {
+const MissionCard = ({ mission, onShowDetail, isMobile = false }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const prevMissionRef = useRef(mission);
+  const prevMissionRef = useRef(null);
   
   // 안전한 기본값 설정 - 백엔드 데이터 구조에 맞게 수정
   const title = mission?.title || mission?.name || 'Unknown Mission';
@@ -22,21 +22,29 @@ const MissionCard = ({ mission, onShowDetail, isMobile = false, lastUpdateTime }
 
   // 업데이트 감지 및 애니메이션
   useEffect(() => {
-    if (prevMissionRef.current && lastUpdateTime) {
+    if (prevMissionRef.current && mission) {
       const prev = prevMissionRef.current;
       const hasChanges = 
-        prev.status !== mission?.status ||
-        prev.progress !== mission?.progress ||
-        prev.robot_id !== mission?.robot_id;
+        prev.status !== mission.status ||
+        prev.progress !== mission.progress ||
+        prev.robot_id !== mission.robot_id;
       
       if (hasChanges) {
         setIsUpdating(true);
-        const timer = setTimeout(() => setIsUpdating(false), 1000);
+        const timer = setTimeout(() => setIsUpdating(false), 800);
         return () => clearTimeout(timer);
       }
     }
-    prevMissionRef.current = mission;
-  }, [mission, lastUpdateTime]);
+    
+    // 현재 미션 데이터를 이전 값으로 저장 (깊은 복사)
+    if (mission) {
+      prevMissionRef.current = {
+        status: mission.status,
+        progress: mission.progress,
+        robot_id: mission.robot_id
+      };
+    }
+  }, [mission?.status, mission?.progress, mission?.robot_id]);
   
   // Date 객체를 안전하게 포맷팅하는 함수
   const formatDateTime = (dateValue) => {
