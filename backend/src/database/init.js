@@ -45,6 +45,8 @@ const initializeDatabase = () => {
           last_status_check DATETIME DEFAULT CURRENT_TIMESTAMP,
           
           -- 태스크 관리 관련 필드들
+          current_task_id INTEGER,
+          currentMission TEXT,
           current_waypoint_index INTEGER DEFAULT 0,
           task_status TEXT DEFAULT 'idle',
           destination_node_id TEXT,
@@ -83,6 +85,8 @@ const initializeDatabase = () => {
         'ALTER TABLE robots ADD COLUMN amr_timestamp TEXT',
         'ALTER TABLE robots ADD COLUMN last_status_check DATETIME DEFAULT CURRENT_TIMESTAMP',
         // 태스크 관리 관련 컬럼들
+        'ALTER TABLE robots ADD COLUMN current_task_id INTEGER',
+        'ALTER TABLE robots ADD COLUMN currentMission TEXT',
         'ALTER TABLE robots ADD COLUMN current_waypoint_index INTEGER DEFAULT 0',
         'ALTER TABLE robots ADD COLUMN task_status TEXT DEFAULT \'idle\'',
         'ALTER TABLE robots ADD COLUMN destination_node_id TEXT',

@@ -84,7 +84,7 @@ export const MENU_ITEMS = [
   { id: 'settings', label: '설정', path: '/settings' }
 ];
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://158.247.245.149:3000/api';
 
 export const WEBSOCKET_URL = import.meta.env.VITE_WEBSOCKET_URL || 'ws://localhost:3000';
 
