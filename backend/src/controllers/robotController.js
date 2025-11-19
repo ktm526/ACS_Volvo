@@ -2,14 +2,29 @@ const Robot = require('../models/Robot');
 const robotStatusService = require('../services/robotStatusService');
 const axios = require('axios');
 
+// order_state 모니터링을 위한 변수들
+let orderStateMonitorInterval = null;
+let isOrderStateMonitoring = false;
+
 const robotController = {
   // 모든 로봇 조회
   async getAllRobots(req, res) {
     try {
       const robots = await Robot.findAll();
+      
+      // 각 로봇의 DB에 저장된 status 값 출력
+      console.log('\n📋 [API 조회] 데이터베이스에서 가져온 로봇 status:');
+      if (robots.length === 0) {
+        console.log('등록된 로봇이 없습니다.');
+      } else {
+        robots.forEach(robot => {
+          console.log(`로봇 ID: ${robot.id} | 이름: ${robot.name} | DB Status: ${robot.status || 'N/A'}`);
+        });
+      }
+      
       res.json({ data: robots });
     } catch (error) {
-
+      console.error('❌ getAllRobots 오류:', error);
       res.status(500).json({ error: '로봇 목록 조회 중 오류가 발생했습니다.' });
     }
   },
@@ -29,9 +44,12 @@ const robotController = {
         return res.status(404).json({ error: '로봇을 찾을 수 없습니다.' });
       }
       
+      // 특정 로봇의 DB에 저장된 status 값 출력
+      console.log(`🤖 [API 조회] 로봇 ID: ${robot.id} | 이름: ${robot.name} | DB Status: ${robot.status || 'N/A'}`);
+      
       res.json({ data: robot });
     } catch (error) {
-
+      console.error('❌ getRobotById 오류:', error);
       res.status(500).json({ error: '로봇 조회 중 오류가 발생했습니다.' });
     }
   },
@@ -436,6 +454,126 @@ const robotController = {
         error: 'AMR 이동 요청 처리 중 오류가 발생했습니다.',
         message: error.message,
         details: error.stack
+      });
+    }
+  },
+
+  // === order_state 모니터링 관련 메서드들 ===
+
+  // order_state 모니터링 시작
+  async startOrderStateMonitoring(req, res) {
+    try {
+      if (isOrderStateMonitoring) {
+        return res.json({
+          success: true,
+          message: 'order_state 모니터링이 이미 실행 중입니다.',
+          isRunning: true
+        });
+      }
+
+      // 1초 간격으로 모든 로봇의 order_state 출력
+      orderStateMonitorInterval = setInterval(async () => {
+        try {
+          const robots = await Robot.findAll();
+          
+          console.log('\n=== 로봇 Order State 모니터링 ===');
+          console.log(`시간: ${new Date().toISOString()}`);
+          
+          if (robots.length === 0) {
+            console.log('등록된 로봇이 없습니다.');
+          } else {
+            robots.forEach(robot => {
+              console.log(`로봇 ID: ${robot.id} | 이름: ${robot.name} | Order State: ${robot.order_state || 'N/A'} | 상태: ${robot.status}`);
+            });
+          }
+          console.log('=====================================\n');
+          
+        } catch (error) {
+          console.error('❌ order_state 모니터링 중 오류:', error.message);
+        }
+      }, 1000); // 1초 간격
+
+      isOrderStateMonitoring = true;
+      
+      console.log('🔄 로봇 order_state 모니터링이 시작되었습니다. (1초 간격)');
+
+      if (res) {
+        res.json({
+          success: true,
+          message: 'order_state 모니터링이 시작되었습니다.',
+          isRunning: true,
+          interval: '1초'
+        });
+      }
+    } catch (error) {
+      console.error('❌ order_state 모니터링 시작 실패:', error.message);
+      
+      if (res) {
+        res.status(500).json({
+          success: false,
+          error: 'order_state 모니터링 시작에 실패했습니다.',
+          details: error.message
+        });
+      }
+    }
+  },
+
+  // order_state 모니터링 중지
+  async stopOrderStateMonitoring(req, res) {
+    try {
+      if (!isOrderStateMonitoring) {
+        return res.json({
+          success: true,
+          message: 'order_state 모니터링이 실행되고 있지 않습니다.',
+          isRunning: false
+        });
+      }
+
+      if (orderStateMonitorInterval) {
+        clearInterval(orderStateMonitorInterval);
+        orderStateMonitorInterval = null;
+      }
+
+      isOrderStateMonitoring = false;
+      
+      console.log('⏹️ 로봇 order_state 모니터링이 중지되었습니다.');
+
+      if (res) {
+        res.json({
+          success: true,
+          message: 'order_state 모니터링이 중지되었습니다.',
+          isRunning: false
+        });
+      }
+    } catch (error) {
+      console.error('❌ order_state 모니터링 중지 실패:', error.message);
+      
+      if (res) {
+        res.status(500).json({
+          success: false,
+          error: 'order_state 모니터링 중지에 실패했습니다.',
+          details: error.message
+        });
+      }
+    }
+  },
+
+  // order_state 모니터링 상태 조회
+  async getOrderStateMonitoringStatus(req, res) {
+    try {
+      res.json({
+        success: true,
+        data: {
+          isRunning: isOrderStateMonitoring,
+          interval: '1초',
+          startedAt: isOrderStateMonitoring ? '실행 중' : '중지됨'
+        }
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: '모니터링 상태 조회에 실패했습니다.',
+        details: error.message
       });
     }
   }

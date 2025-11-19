@@ -230,9 +230,9 @@ function MapNode({ node, mapInfo, theme = 'dark', isSelected = false, onHover, o
     const isDark = theme === 'dark';
     return { 
       color: isDark ? COLORS.PRIMARY : '#0088ff', // 라이트 테마에서 더 밝은 파란색
-      size: 0.075,      // 기본 크기
-      height: 0.1,      // 기본 높이
-      hoverSize: 0.15   // 호버 영역 크기 (2배로 확대)
+      size: 0.15,       // 기본 크기 (2배)
+      height: 0.2,      // 기본 높이 (2배)
+      hoverSize: 0.3    // 호버 영역 크기 (2배로 확대)
     };
   }, [theme]);
   
@@ -283,21 +283,26 @@ function MapNode({ node, mapInfo, theme = 'dark', isSelected = false, onHover, o
   // 모든 로봇 표시 (필터링 제거)
   const allRobots = robots || [];
 
-  // 로봇 상태별 색상과 아이콘
+  // 로봇 상태별 색상과 아이콘 (새로운 order_status 기반)
   const getStatusInfo = (status) => {
     switch (status) {
-      case 'moving':
-        return { color: '#3B82F6', icon: '▶', text: '이동중', available: false };
       case 'idle':
         return { color: '#22C55E', icon: '⏸', text: '대기중', available: true };
+      case 'stop':
+        return { color: '#EF4444', icon: '⏹', text: '정지', available: false };
+      case 'working':
+        return { color: '#3B82F6', icon: '▶', text: '작업중', available: false };
+      case 'pause':
+        return { color: '#F59E0B', icon: '⏸', text: '일시정지', available: false };
       case 'charging':
         return { color: '#F59E0B', icon: '⚡', text: '충전중', available: true };
-      case 'working':
-        return { color: '#F59E0B', icon: '⚙', text: '작업중', available: false };
       case 'error':
         return { color: '#EF4444', icon: '✕', text: '오류', available: false };
       case 'disconnected':
         return { color: '#6B7280', icon: '⚠', text: '연결끊김', available: false };
+      // 하위 호환성
+      case 'moving':
+        return { color: '#3B82F6', icon: '▶', text: '작업중', available: false };
       default:
         return { color: '#6B7280', icon: '●', text: '알수없음', available: false };
     }
@@ -761,7 +766,7 @@ function MapConnection({ connection, nodes, mapInfo, theme = 'dark' }) {
       ref={lineRef}
       points={points}
       color={connectionColor}
-      lineWidth={2}
+      lineWidth={1}
       transparent
       opacity={0.7}
     />

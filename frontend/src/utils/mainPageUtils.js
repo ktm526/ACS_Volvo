@@ -28,10 +28,15 @@ export const getTypeIcon = (type) => {
 
 export const getRobotStatusIcon = (status) => {
   switch (status) {
-    case 'moving': return 'fas fa-play';
-    case 'charging': return 'fas fa-bolt';
-    case 'error': return 'fas fa-times';
-    case 'idle': return 'fas fa-pause';
+    case 'idle': return 'fas fa-pause';        // 대기 (order_status: 0)
+    case 'stop': return 'fas fa-stop';         // 정지 (order_status: 1)
+    case 'working': return 'fas fa-play';      // 작업중 (order_status: 2)
+    case 'pause': return 'fas fa-pause-circle'; // 일시정지 (order_status: 3)
+    case 'charging': return 'fas fa-bolt';     // 충전중
+    case 'error': return 'fas fa-times';       // 오류
+    case 'disconnected': return 'fas fa-unlink'; // 연결 끊김
+    // 하위 호환성을 위한 기존 상태들
+    case 'moving': return 'fas fa-play';       // moving을 working으로 처리
     default: return 'fas fa-pause';
   }
 };
@@ -50,8 +55,10 @@ export const calculateStats = (robots) => {
   if (!robots || robots.length === 0) {
     return {
       total: 0,
-      moving: 0,
       idle: 0,
+      stop: 0,
+      working: 0,
+      pause: 0,
       charging: 0,
       error: 0,
       averageBattery: 0
@@ -60,11 +67,13 @@ export const calculateStats = (robots) => {
 
   return {
     total: robots.length,
-    moving: robots.filter(r => r.status === 'moving').length,
     idle: robots.filter(r => r.status === 'idle').length,
+    stop: robots.filter(r => r.status === 'stop').length,
+    working: robots.filter(r => r.status === 'working' || r.status === 'moving').length, // moving도 working으로 카운트
+    pause: robots.filter(r => r.status === 'pause').length,
     charging: robots.filter(r => r.status === 'charging').length,
-    error: robots.filter(r => r.status === 'error').length,
-    averageBattery: Math.round(robots.reduce((sum, r) => sum + r.battery, 0) / robots.length)
+    error: robots.filter(r => r.status === 'error' || r.status === 'disconnected').length,
+    averageBattery: Math.round(robots.reduce((sum, r) => sum + (r.battery || 0), 0) / robots.length)
   };
 };
 

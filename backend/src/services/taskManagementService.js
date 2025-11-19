@@ -2,6 +2,7 @@ const Robot = require('../models/Robot');
 const Mission = require('../models/Mission');
 const axios = require('axios');
 const Logger = require('../utils/logger');
+const { query } = require('../database/connection');
 
 class TaskManagementService {
   constructor() {
@@ -149,13 +150,15 @@ class TaskManagementService {
   async getIdleRobots() {
     try {
       const robots = await Robot.findAll();
-              const idleRobots = robots.filter(robot => 
-          robot.status === 'idle' && 
-          (robot.connection_status === true || robot.connection_status === 1) &&
-          (!robot.current_task_id || robot.task_status === 'idle')
-        );
+      const idleRobots = robots.filter(robot => 
+        // 태스크 할당 가능한 상태: idle (대기) 상태만
+        robot.status === 'idle' && 
+        (robot.connection_status === true || robot.connection_status === 1) &&
+        (!robot.current_task_id || robot.task_status === 'idle')
+      );
       
-      //Logger.debug(`전체 로봇 ${robots.length}개 중 대기 중인 로봇 ${idleRobots.length}개 발견`);
+      //Logger.debug(`전체 로봇 ${robots.length}개 중 태스크 할당 가능한 로봇 ${idleRobots.length}개 발견`);
+      //Logger.debug(`상태별 로봇: idle=${robots.filter(r => r.status === 'idle').length}, stop=${robots.filter(r => r.status === 'stop').length}, working=${robots.filter(r => r.status === 'working').length}, pause=${robots.filter(r => r.status === 'pause').length}`);
       return idleRobots;
     } catch (error) {
       Logger.error('❌ 대기 중인 로봇 조회 오류:', { error: error.message });
@@ -241,12 +244,12 @@ class TaskManagementService {
     try {
      // Logger.info(`🎯 로봇 ${robot.name}(ID: ${robot.id})에 태스크 "${task.name}"(ID: ${task.id}) 할당 시작`);
 
-      // 로봇에 태스크 정보 저장 및 상태를 moving으로 변경
+      // 로봇에 태스크 정보 저장 및 상태를 working으로 변경
       await robot.update({
         current_task_id: task.id,
         current_waypoint_index: 0,
         task_status: 'executing',
-        status: 'moving',  // 로봇 상태를 moving으로 변경
+        status: 'working',  // 로봇 상태를 working으로 변경 (order_status: 2에 해당)
         last_command_sent: new Date()  // 명령 전송 시간 기록
       });
 
@@ -256,7 +259,9 @@ class TaskManagementService {
         robot_id: robot.id
       });
 
-      //Logger.info(`✅ 데이터베이스 업데이트 완료: 로봇 상태 = moving, 태스크 상태 = executing, 미션 상태 = in_progress`);
+      this.logTaskActivity('START', { robot, mission: task });
+
+      //Logger.info(`✅ 데이터베이스 업데이트 완료: 로봇 상태 = working, 태스크 상태 = executing, 미션 상태 = in_progress`);
 
       // 첫 번째 웨이포인트로 이동 명령 전송
       if (task.waypoints && task.waypoints.length > 0) {
@@ -367,6 +372,8 @@ class TaskManagementService {
       // 태스크 상태를 완료로 변경
       await task.updateStatus('completed');
 
+      this.logTaskActivity('DONE', { robot, mission: task });
+
       //Logger.info(`✅ 태스크 완료: ${robot.name} -> ${task.name}`);
 
       // 해당 로봇에 할당된 다른 태스크가 있는지 확인
@@ -375,9 +382,29 @@ class TaskManagementService {
         //Logger.info(`📋 로봇 ${robot.name}에 대기 중인 다음 태스크 ${nextTasks.length}개 발견`);
         // 다음 태스크 할당
         await this.assignTaskToRobot(robot, nextTasks[0]);
-      } else {
-        //Logger.info(`😴 로봇 ${robot.name}: 더 이상 할당된 태스크가 없어 대기 상태로 전환`);
+        return;
       }
+
+      // 시스템 전역 대기 태스크가 있다면 복귀 미션을 만들지 않고 종료
+      const availableTasks = await this.getAvailableTasks();
+      if (availableTasks.length > 0) {
+        //Logger.info(`📝 대기 중인 다른 작업이 있어 HOME 복귀 미션을 생성하지 않습니다.`);
+        return;
+      }
+
+      // 이미 HOME 복귀 미션을 수행 중이거나 방금 완료했다면 중복 생성 방지
+      if (task.mission_type === 'return_home') {
+        //Logger.info(`🏠 로봇 ${robot.name}: HOME 복귀 미션 완료, 추가 미션 없음`);
+        return;
+      }
+
+      const hasReturnHomeMission = await this.hasActiveReturnHomeMission(robot.id);
+      if (hasReturnHomeMission) {
+        //Logger.info(`🏠 로봇 ${robot.name}: 진행 중인 HOME 복귀 미션 존재`);
+        return;
+      }
+
+      await this.createReturnHomeMission(robot);
 
     } catch (error) {
       Logger.error(`❌ 태스크 완료 처리 중 오류 (로봇: ${robot.name}):`, { error: error.message, stack: error.stack });
@@ -536,6 +563,103 @@ class TaskManagementService {
       pollInterval: this.pollInterval,
       httpTimeout: this.httpTimeout
     };
+  }
+
+  async hasActiveReturnHomeMission(robotId) {
+    try {
+      const missions = await Mission.findByRobotId(robotId);
+      return missions.some(mission =>
+        mission.mission_type === 'return_home' &&
+        (mission.status === 'pending' || mission.status === 'in_progress')
+      );
+    } catch (error) {
+      Logger.error('❌ HOME 복귀 미션 상태 확인 중 오류:', { error: error.message });
+      return false;
+    }
+  }
+
+  async createReturnHomeMission(robot) {
+    try {
+      const homeNode = await this.getHomeNode();
+      if (!homeNode) {
+        this.logTaskActivity('HOME_DISPATCH', {
+          robot,
+          info: 'HOME 노드를 찾을 수 없어 복귀 미션을 생성하지 못했습니다.'
+        });
+        return;
+      }
+
+      const waypoint = {
+        stationId: homeNode.node_index !== undefined ? String(homeNode.node_index) : String(homeNode.id),
+        stationName: homeNode.name,
+        stepType: 'navigate',
+        mapId: homeNode.map_id,
+        x: homeNode.position_x,
+        y: homeNode.position_y,
+        yaw: homeNode.yaw
+      };
+
+      const mission = await Mission.create({
+        name: `${robot.name} HOME 복귀`,
+        mission_type: 'return_home',
+        priority: 'high',
+        waypoints: [waypoint],
+        description: '작업 완료 후 자동 생성된 HOME 복귀 임무'
+      });
+
+      this.logTaskActivity('HOME_DISPATCH', {
+        robot,
+        mission,
+        info: `target:${waypoint.stationName || 'HOME'} (#${waypoint.stationId})`
+      });
+
+      await this.assignTaskToRobot(robot, mission);
+    } catch (error) {
+      Logger.error('❌ HOME 복귀 미션 생성 중 오류:', { error: error.message, stack: error.stack });
+    }
+  }
+
+  async getHomeNode() {
+    try {
+      const rows = await query(
+        'SELECT * FROM map_nodes WHERE LOWER(name) = LOWER(?) ORDER BY id DESC LIMIT 1',
+        ['HOME']
+      );
+      return rows.length > 0 ? rows[0] : null;
+    } catch (error) {
+      Logger.error('❌ HOME 노드 조회 중 오류:', { error: error.message });
+      return null;
+    }
+  }
+
+  logTaskActivity(type, { robot, mission, info }) {
+    const timestamp = new Date().toISOString();
+    let label = '';
+    switch (type) {
+      case 'START':
+        label = '작업 시작';
+        break;
+      case 'DONE':
+        label = mission?.mission_type === 'return_home' ? 'HOME 복귀 완료' : '작업 완료';
+        break;
+      case 'HOME_DISPATCH':
+        label = 'HOME 복귀 요청';
+        break;
+      default:
+        label = type;
+        break;
+    }
+
+    const parts = [
+      `[${timestamp}] ${label}`,
+      robot ? `로봇:${robot.name || robot.id}` : null,
+      mission ? `미션:${mission.name || mission.id}${mission.mission_type ? ` (${mission.mission_type})` : ''}` : null,
+      info || null
+    ].filter(Boolean);
+
+    if (parts.length > 0) {
+      console.log(parts.join(' | '));
+    }
   }
 }
 

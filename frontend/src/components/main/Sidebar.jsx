@@ -190,8 +190,9 @@ const Sidebar = ({
         
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: isMobile ? 'var(--space-sm)' : 'var(--space-md)'
+          gridTemplateColumns: sidebarTab === 'robots' ? 'repeat(2, 1fr)' : 'repeat(2, 1fr)',
+          gap: isMobile ? 'var(--space-sm)' : 'var(--space-md)',
+          marginBottom: 'var(--space-md)'
         }}>
           {sidebarTab === 'robots' ? (
             <>
@@ -265,9 +266,9 @@ const Sidebar = ({
                 <div style={{
                   fontSize: isMobile ? 'var(--font-size-lg)' : 'var(--font-size-2xl)',
                   fontWeight: '700',
-                  color: 'var(--status-success)'
+                  color: '#22C55E'
                 }}>
-                  {isLoading ? '---' : stats.moving}
+                  {isLoading ? '---' : stats.idle}
                 </div>
                 <div style={{
                   fontSize: 'var(--font-size-xs)',
@@ -275,7 +276,7 @@ const Sidebar = ({
                   textTransform: 'uppercase',
                   fontWeight: '600'
                 }}>
-                  작업 중
+                  대기 중
                 </div>
               </div>
             </>
@@ -355,6 +356,88 @@ const Sidebar = ({
             </>
           )}
         </div>
+
+        {/* 로봇 상태별 추가 통계 */}
+        {sidebarTab === 'robots' && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: isMobile ? 'var(--space-sm)' : 'var(--space-md)',
+            marginBottom: 'var(--space-md)'
+          }}>
+            <div style={{
+              padding: isMobile ? 'var(--space-sm)' : 'var(--space-md)',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: 'var(--radius-lg)',
+              textAlign: 'center',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              {isLoading && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.1), transparent)',
+                  animation: 'loading-shimmer 2s infinite'
+                }}></div>
+              )}
+              <div style={{
+                fontSize: isMobile ? 'var(--font-size-lg)' : 'var(--font-size-2xl)',
+                fontWeight: '700',
+                color: '#3B82F6'
+              }}>
+                {isLoading ? '---' : stats.working}
+              </div>
+              <div style={{
+                fontSize: 'var(--font-size-xs)',
+                color: 'var(--text-tertiary)',
+                textTransform: 'uppercase',
+                fontWeight: '600'
+              }}>
+                작업 중
+              </div>
+            </div>
+
+            <div style={{
+              padding: isMobile ? 'var(--space-sm)' : 'var(--space-md)',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: 'var(--radius-lg)',
+              textAlign: 'center',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              {isLoading && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.1), transparent)',
+                  animation: 'loading-shimmer 2s infinite 0.5s'
+                }}></div>
+              )}
+              <div style={{
+                fontSize: isMobile ? 'var(--font-size-lg)' : 'var(--font-size-2xl)',
+                fontWeight: '700',
+                color: '#EF4444'
+              }}>
+                {isLoading ? '---' : (stats.stop + stats.error)}
+              </div>
+              <div style={{
+                fontSize: 'var(--font-size-xs)',
+                color: 'var(--text-tertiary)',
+                textTransform: 'uppercase',
+                fontWeight: '600'
+              }}>
+                정지/오류
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 컨텐츠 영역 */}

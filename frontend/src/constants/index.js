@@ -119,11 +119,12 @@ export const STATUS_COLORS = {
   DEFAULT: '#6B7280'        // 어두운 회색
 };
 
-// 로봇 상태별 색상 시스템
+// 로봇 상태별 색상 시스템 (새로운 order_status 기반)
 export const ROBOT_STATUS_COLORS = {
-  MOVING: '#3B82F6',        // 파란색 (이동중)
-  IDLE: '#22C55E',          // 녹색 (대기)
-  WORKING: '#F59E0B',       // 주황색 (작업중)
+  IDLE: '#22C55E',          // 녹색 (대기 - order_status: 0)
+  STOP: '#EF4444',          // 빨간색 (정지 - order_status: 1)
+  WORKING: '#3B82F6',       // 파란색 (작업중 - order_status: 2)
+  PAUSE: '#F59E0B',         // 주황색 (일시정지 - order_status: 3)
   CHARGING: '#F59E0B',      // 주황색 (충전중)
   ERROR: '#EF4444',         // 빨간색 (오류)
   DISCONNECTED: '#6B7280',  // 회색 (연결 끊김)
@@ -134,21 +135,26 @@ export const ROBOT_STATUS_COLORS = {
 export const getStatusColor = (status, type = 'mission') => {
   const normalizedStatus = status?.toLowerCase().replace('_', '');
   
-  // 로봇 상태인 경우
+  // 로봇 상태인 경우 (새로운 order_status 기반)
   if (type === 'robot') {
     switch (normalizedStatus) {
-      case 'moving':
-        return ROBOT_STATUS_COLORS.MOVING;
       case 'idle':
         return ROBOT_STATUS_COLORS.IDLE;
+      case 'stop':
+        return ROBOT_STATUS_COLORS.STOP;
       case 'working':
         return ROBOT_STATUS_COLORS.WORKING;
+      case 'pause':
+        return ROBOT_STATUS_COLORS.PAUSE;
       case 'charging':
         return ROBOT_STATUS_COLORS.CHARGING;
       case 'error':
         return ROBOT_STATUS_COLORS.ERROR;
       case 'disconnected':
         return ROBOT_STATUS_COLORS.DISCONNECTED;
+      // 하위 호환성을 위한 기존 상태들
+      case 'moving':
+        return ROBOT_STATUS_COLORS.WORKING; // moving을 working으로 매핑
       default:
         return ROBOT_STATUS_COLORS.DEFAULT;
     }

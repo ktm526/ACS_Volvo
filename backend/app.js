@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const requestMonitor = require('./src/middleware/requestMonitor');
 
 // 라우트 import
 const routes = require('./src/routes');
@@ -13,6 +14,7 @@ const app = express();
 app.use(helmet()); // 보안 강화
 app.use(cors());   // CORS 활성화
 app.use(express.json());
+app.use(requestMonitor());
 //app.use(morgan('dev')); // 로깅
 
 // 라우트 설정

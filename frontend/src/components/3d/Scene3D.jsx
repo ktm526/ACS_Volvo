@@ -431,7 +431,7 @@ function Robot({ robot, colors, isSelected = false, onHover, onHoverEnd, theme }
           position={[0, 0, 0]} 
           rotation={[0, 0, 0]}
         >
-          <ringGeometry args={[0.1, 0.2, 32]} />
+          <ringGeometry args={[0.4, 0.8, 32]} />
           <meshStandardMaterial
             color={statusColor}
             emissive={statusColor}
@@ -446,7 +446,7 @@ function Robot({ robot, colors, isSelected = false, onHover, onHoverEnd, theme }
           position={[0, 0, 0]} 
           rotation={[0, 0, 0]}
         >
-          <ringGeometry args={[0.05, 0.08, 32]} />
+          <ringGeometry args={[0.2, 0.32, 32]} />
           <meshStandardMaterial
             color={statusColor}
             emissive={statusColor}
@@ -465,7 +465,7 @@ function Robot({ robot, colors, isSelected = false, onHover, onHoverEnd, theme }
         onPointerEnter={handlePointerEnter}
         onPointerLeave={handlePointerLeave}
       >
-        <coneGeometry args={[0.12, 0.4, 8]} />
+        <coneGeometry args={[0.48, 1.6, 8]} />
         <meshStandardMaterial
           color={statusColor}
           emissive={statusColor}
@@ -479,7 +479,7 @@ function Robot({ robot, colors, isSelected = false, onHover, onHoverEnd, theme }
       {isSelected && (
         <group rotation={[-Math.PI / 2, 0, robotDirection]}>
           <mesh position={[0, -0.2, 0]} rotation={[0, 0, 0]}>
-            <ringGeometry args={[0.25, 0.3, 32]} />
+            <ringGeometry args={[1.0, 1.2, 32]} />
             <meshStandardMaterial
               color={statusColor}
               emissive={statusColor}
@@ -605,10 +605,14 @@ function RobotTooltip({ robot, statusColor, theme = 'dark' }) {
           color: '#ffffff',
           fontWeight: '600'
         }}>
-          {robot.status === 'moving' ? '▶' :
+          {robot.status === 'idle' ? '⏸' :
+           robot.status === 'stop' ? '⏹' :
+           robot.status === 'working' ? '▶' :
+           robot.status === 'pause' ? '⏸' :
            robot.status === 'charging' ? '⚡' :
            robot.status === 'error' ? '✕' :
-           robot.status === 'disconnected' ? '⚠' : '⏸'}
+           robot.status === 'disconnected' ? '⚠' :
+           robot.status === 'moving' ? '▶' : '⏸'}
         </div>
         <div>
           <div style={{ fontSize: '16px', fontWeight: '700', color: themeColors.textPrimary }}>
@@ -736,7 +740,7 @@ function PathTrail({ path, color }) {
       <Line
         points={validPoints}
         color={color || '#FFFFFF'}
-        lineWidth={2}
+        lineWidth={1}
         dashed={true}
         dashScale={0.5}
         dashSize={0.5}

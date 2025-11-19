@@ -53,10 +53,14 @@ const RobotDetailModal = ({ robot, isOpen, onClose }) => {
   const getStatusText = (status) => {
     const statusMap = {
       'idle': '대기중',
-      'moving': '이동중',
+      'stop': '정지',
+      'working': '작업중',
+      'pause': '일시정지',
       'charging': '충전중',
       'error': '오류',
-      'disconnected': '연결끊김'
+      'disconnected': '연결끊김',
+      // 하위 호환성
+      'moving': '작업중'
     };
     return statusMap[status] || status;
   };

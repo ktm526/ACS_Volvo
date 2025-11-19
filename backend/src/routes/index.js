@@ -6,6 +6,7 @@ const robotRoutes = require('./robots');
 const mapRoutes = require('./maps');
 const missionRoutes = require('./missions');
 const pcdRoutes = require('./pcd');
+const monitoringRoutes = require('./monitoring');
 
 // 기본 라우트
 router.get('/', (req, res) => {
@@ -16,7 +17,8 @@ router.get('/', (req, res) => {
       robots: '/api/robots',
       maps: '/api/maps',
       missions: '/api/missions',
-      pcd: '/api/pcd'
+      pcd: '/api/pcd',
+      monitoring: '/api/monitoring/network/today'
     }
   });
 });
@@ -26,5 +28,6 @@ router.use('/robots', robotRoutes);
 router.use('/maps', mapRoutes);
 router.use('/missions', missionRoutes);
 router.use('/pcd', pcdRoutes);
+router.use('/monitoring', monitoringRoutes);
 
 module.exports = router; 

@@ -190,6 +190,42 @@ const initializeDatabase = () => {
         
       });
 
+      // 네트워크 모니터링 로그 테이블
+      db.run(`
+        CREATE TABLE IF NOT EXISTS network_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          client_type TEXT DEFAULT 'unknown',
+          source_ip TEXT,
+          user_agent TEXT,
+          method TEXT NOT NULL,
+          path TEXT NOT NULL,
+          status_code INTEGER,
+          response_time_ms REAL,
+          reported_delay_ms REAL,
+          packet_loss_rate REAL,
+          metadata TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `, (err) => {
+        if (err) {
+          
+          reject(err);
+          return;
+        }
+        
+      });
+
+      db.run(`
+        CREATE INDEX IF NOT EXISTS idx_network_logs_created_at ON network_logs(created_at);
+      `, (err) => {
+        if (err) {
+          
+          reject(err);
+          return;
+        }
+        
+      });
+
       // 픽셀 데이터 조회 성능 향상을 위한 인덱스
       db.run(`
         CREATE INDEX IF NOT EXISTS idx_map_pixels_map_id ON map_pixels(map_id);

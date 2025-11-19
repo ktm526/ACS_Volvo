@@ -170,18 +170,10 @@ class Robot {
         amrStatusData.angle = statusData.position_theta;
       }
 
-      // 상태 정보 업데이트 (driving_status를 기반으로 상태 매핑)
-      if (statusData.driving_status !== undefined) {
-        switch (statusData.driving_status) {
-          case 0:
-            amrStatusData.status = 'idle';
-            break;
-          case 1:
-            amrStatusData.status = 'moving';
-            break;
-          default:
-            amrStatusData.status = 'idle';
-        }
+      // 상태 정보 업데이트 (robotStatusService에서 이미 매핑된 status 사용)
+      if (statusData.status !== undefined) {
+        amrStatusData.status = statusData.status;
+        console.log(`💾 [DB 업데이트] 로봇 ID: ${this.id} | 상태 변경: ${this.status} → ${statusData.status}`);
       }
 
       // 충전 상태 확인
